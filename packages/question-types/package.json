@@ -1,0 +1,26 @@
+{
+  "name": "@xingjuan/question-types",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "题型插件:每种题型注册 engine handler(非UI) + 提供 React 渲染组件",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@xingjuan/engine": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.1",
+    "react": "^19.0.0",
+    "typescript": "^5.7.2"
+  }
+}

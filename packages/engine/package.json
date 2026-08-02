@@ -1,0 +1,21 @@
+{
+  "name": "@xingjuan/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "框架无关的问卷内核:schema 类型、逻辑求值器、校验、normalize、题型注册表",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

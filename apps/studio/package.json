@@ -1,0 +1,27 @@
+{
+  "name": "@xingjuan/studio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "工作台:看板 + 编辑器 + 预览 + 分析(登录)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@xingjuan/engine": "workspace:*",
+    "@xingjuan/question-types": "workspace:*",
+    "@xingjuan/ui": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}

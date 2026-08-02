@@ -1,0 +1,70 @@
+{
+  "description": "逻辑求值器黄金向量 —— 前后端共享契约(见 frontend.md 决策6)。语言中立:后端用任意语言实现求值器时,读取本文件作为验收用例,保证与前端行为一致、不漂移。每个向量:给定 rules + answers,evaluate 后期望被隐藏的题目 id 集合(expectHidden,顺序无关)。修改逻辑语义时,先改本文件再改实现——本文件即契约。",
+  "vectors": [
+    {
+      "name": "条件不满足 → 不隐藏",
+      "rules": [
+        { "id": "r1", "conditions": [{ "qid": "q1", "op": "eq", "value": "no" }], "combinator": "AND", "action": { "type": "hide", "target": "q2" } }
+      ],
+      "answers": { "q1": "yes" },
+      "expectHidden": []
+    },
+    {
+      "name": "eq 命中 → 隐藏目标题",
+      "rules": [
+        { "id": "r1", "conditions": [{ "qid": "q1", "op": "eq", "value": "no" }], "combinator": "AND", "action": { "type": "hide", "target": "q2" } }
+      ],
+      "answers": { "q1": "no" },
+      "expectHidden": ["q2"]
+    },
+    {
+      "name": "AND:全真才命中",
+      "rules": [
+        { "id": "r1", "conditions": [{ "qid": "q1", "op": "eq", "value": "a" }, { "qid": "q2", "op": "gt", "value": 10 }], "combinator": "AND", "action": { "type": "hide", "target": "q3" } }
+      ],
+      "answers": { "q1": "a", "q2": 5 },
+      "expectHidden": []
+    },
+    {
+      "name": "OR:一真即命中",
+      "rules": [
+        { "id": "r1", "conditions": [{ "qid": "q1", "op": "eq", "value": "a" }, { "qid": "q2", "op": "gt", "value": 10 }], "combinator": "OR", "action": { "type": "hide", "target": "q3" } }
+      ],
+      "answers": { "q1": "x", "q2": 20 },
+      "expectHidden": ["q3"]
+    },
+    {
+      "name": "includes:多选答案包含值",
+      "rules": [
+        { "id": "r1", "conditions": [{ "qid": "q1", "op": "includes", "value": "b" }], "combinator": "AND", "action": { "type": "hide", "target": "q2" } }
+      ],
+      "answers": { "q1": ["a", "b", "c"] },
+      "expectHidden": ["q2"]
+    },
+    {
+      "name": "answered:已作答判定(空串不算已答)",
+      "rules": [
+        { "id": "r1", "conditions": [{ "qid": "q1", "op": "answered", "value": null }], "combinator": "AND", "action": { "type": "hide", "target": "q2" } }
+      ],
+      "answers": { "q1": "" },
+      "expectHidden": []
+    },
+    {
+      "name": "show 覆盖同题 hide",
+      "rules": [
+        { "id": "r1", "conditions": [{ "qid": "q1", "op": "eq", "value": "no" }], "combinator": "AND", "action": { "type": "hide", "target": "q2" } },
+        { "id": "r2", "conditions": [{ "qid": "q1", "op": "eq", "value": "no" }], "combinator": "AND", "action": { "type": "show", "target": "q2" } }
+      ],
+      "answers": { "q1": "no" },
+      "expectHidden": []
+    },
+    {
+      "name": "空条件组不触发",
+      "rules": [
+        { "id": "r1", "conditions": [], "combinator": "AND", "action": { "type": "hide", "target": "q2" } }
+      ],
+      "answers": {},
+      "expectHidden": []
+    }
+  ]
+}
