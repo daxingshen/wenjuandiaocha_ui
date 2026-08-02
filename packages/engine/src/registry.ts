@@ -11,8 +11,21 @@ import type { Question } from './schema.js';
 /** 一道题规范化后的一行(喂统计与交叉分析,约束 4)。 */
 export interface NormalizedRow {
   qid: string;
+  /** 矩阵子行 id(每子行一行);标量题省略。交叉分析按 (qid, subId) 聚合 */
+  subId?: string;
   /** 规范化标量值:选项 value / 数值 / 文本;多选拆多行 */
   value: string | number;
+}
+
+/**
+ * 一道题在「逻辑规则」里可被引用的东西。逻辑 UI 靠它保持题型无关:
+ * 不 hardcode「矩阵」,而是问题型「你有哪些可引用的子行/候选值」(约束 2、3)。
+ */
+export interface LogicRef {
+  /** 可作为条件 subId 的子行(如矩阵各行);无则条件只引用整题 */
+  subFields?: Array<{ id: string; label: string }>;
+  /** 条件比较值的候选(如选项/刻度值);有则值走下拉,无则自由输入 */
+  values?: Array<{ value: string | number; label: string }>;
 }
 
 /** 题型处理器:非 UI 的行为契约。UI 渲染在 question-types 包用 type 关联。 */
@@ -29,6 +42,8 @@ export interface QuestionTypeHandler {
   validate: (question: Question, answer: unknown) => string | null;
   /** 规范化答案为若干行(多选→多行,未答→空数组) */
   normalize: (question: Question, answer: unknown) => NormalizedRow[];
+  /** 可选:声明本题在逻辑规则里可被引用的子行与候选值(供逻辑 UI 构建条件) */
+  logicRef?: (question: Question) => LogicRef;
 }
 
 const handlers = new Map<string, QuestionTypeHandler>();

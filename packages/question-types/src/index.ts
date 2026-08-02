@@ -6,9 +6,19 @@
  * 加题型 = 在此 import 并调用其 register 函数,engine/apps 均不改(约束 2)。
  */
 import { registerSingleChoice } from './single-choice/index.js';
+import { registerMatrixSingle } from './matrix-single/index.js';
+import { registerMultiChoice } from './multi-choice/index.js';
+import { registerScale } from './scale/index.js';
+import { registerTextInput } from './text-input/index.js';
+import { registerTextarea } from './textarea/index.js';
 
 export function registerAll(): void {
   registerSingleChoice();
+  registerMatrixSingle();
+  registerMultiChoice();
+  registerScale();
+  registerTextInput();
+  registerTextarea();
 }
 
 export { getUI, registerUI } from './types.js';

@@ -1,16 +1,22 @@
 /**
- * 作答端骨架:演示 engine 完整链路。
- * 加载 schema → 按 type 从注册表取组件渲染 → 逻辑求值隐藏题 → 提交时校验 + normalize。
- * 用一份内联 demo 问卷代替后端接口(业务阶段换成 API 加载)。
+ * 作答端入口:薄壳。按 :id 加载 schema → 交给 Fill 作答 → 提交后 Done。
+ * runtime 保持轻:无路由库、无图表、无 studio 依赖(铁律)。作答态走 useReducer + engine。
+ *
+ * schema 来源:优先 fetchSurvey(真实端点);api-contract 未定/dev 无后端时回落内联 demo 并标注,
+ * 让 `pnpm dev:runtime` 开箱可跑且诚实。
  */
-import { useMemo, useState } from 'react';
-import { evaluate, normalizeSurvey, validateSurvey, type Answers, type SurveySchema } from '@xingjuan/engine';
-import { getUI } from '@xingjuan/question-types';
+import { useEffect, useState } from 'react';
+import type { SurveySchema } from '@xingjuan/engine';
+import { fetchSurvey } from './api/client.js';
+import { Fill } from './pages/Fill.js';
+import { Done } from './pages/Done.js';
+import { useFill } from './useFill.js';
 
+/** 演示问卷:含一条显隐逻辑(q1 选“没用过”→ 隐藏 q2)。回落用。 */
 const DEMO: SurveySchema = {
   id: 'demo',
   type: 'survey',
-  title: '示例问卷',
+  title: '示例问卷(演示数据)',
   version: 1,
   questions: [
     {
@@ -27,56 +33,72 @@ const DEMO: SurveySchema = {
     },
     {
       id: 'q2',
-      type: 'single-choice',
-      title: '整体是否满意?',
+      type: 'scale',
+      title: '整体满意程度?',
       required: true,
-      props: {
-        options: [
-          { value: 'good', label: '满意' },
-          { value: 'bad', label: '不满意' },
-        ],
-      },
+      props: { min: 1, max: 5, minLabel: '很不满意', maxLabel: '非常满意' },
     },
   ],
-  // 逻辑:q1 选“没用过”则隐藏 q2(显隐逻辑,约束 3)
   rules: [
     { id: 'r1', conditions: [{ qid: 'q1', op: 'eq', value: 'no' }], combinator: 'AND', action: { type: 'hide', target: 'q2' } },
   ],
 };
 
+/** 从 hash(#/s/:id)取问卷 id;无则空。 */
+function surveyIdFromHash(): string {
+  const m = (location.hash || '').match(/^#\/s\/([^/]+)/);
+  return m ? decodeURIComponent(m[1]!) : '';
+}
+
+type LoadState =
+  | { status: 'loading' }
+  | { status: 'ready'; schema: SurveySchema; demo: boolean }
+  | { status: 'error'; message: string };
+
 export function App() {
-  const [answers, setAnswers] = useState<Answers>({});
-  const { hidden } = useMemo(() => evaluate(DEMO.rules, answers), [answers]);
-  const [submitted, setSubmitted] = useState<string>('');
+  const id = surveyIdFromHash();
+  const [load, setLoad] = useState<LoadState>({ status: 'loading' });
 
-  const setAnswer = (qid: string, value: unknown) => setAnswers((prev) => ({ ...prev, [qid]: value }));
-
-  const onSubmit = () => {
-    const errors = validateSurvey(DEMO, answers);
-    if (errors.length > 0) {
-      setSubmitted('校验未通过:' + errors.map((e) => `${e.qid} ${e.message}`).join(';'));
+  useEffect(() => {
+    let alive = true;
+    // 无 id 直接用 demo;有 id 打端点,失败回落 demo 并标注。
+    if (!id) {
+      setLoad({ status: 'ready', schema: DEMO, demo: true });
       return;
     }
-    const rows = normalizeSurvey(DEMO, answers);
-    setSubmitted('提交成功。规范化行:' + JSON.stringify(rows));
-  };
+    fetchSurvey(id)
+      .then((schema) => alive && setLoad({ status: 'ready', schema, demo: false }))
+      .catch(() => alive && setLoad({ status: 'ready', schema: { ...DEMO, id }, demo: true }));
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  if (load.status === 'loading') {
+    return <main style={{ fontFamily: 'var(--font)', textAlign: 'center', padding: 48, color: 'var(--ink-muted)' }}>加载中…</main>;
+  }
+  if (load.status === 'error') {
+    return <main style={{ fontFamily: 'var(--font)', textAlign: 'center', padding: 48, color: 'var(--critical)' }}>{load.message}</main>;
+  }
+  return <Survey schema={load.schema} demo={load.demo} />;
+}
+
+/** 承载单份问卷的作答态(useFill 依赖稳定的 surveyId,故拆成子组件按 schema.id 挂载)。 */
+function Survey({ schema, demo }: { schema: SurveySchema; demo: boolean }) {
+  const [state, dispatch] = useFill(schema.id);
 
   return (
-    <main style={{ fontFamily: 'var(--font)', maxWidth: 480, margin: '2rem auto', color: 'var(--ink)' }}>
-      <h1>{DEMO.title}</h1>
-      {DEMO.questions.map((q) => {
-        if (hidden.has(q.id)) return null;
-        const ui = getUI(q.type);
-        if (!ui) return <p key={q.id}>未知题型:{q.type}</p>;
-        const Answer = ui.Answer;
-        return (
-          <div key={q.id} style={{ margin: '1rem 0' }}>
-            <Answer question={q} value={answers[q.id]} onChange={(v) => setAnswer(q.id, v)} />
-          </div>
-        );
-      })}
-      <button type="button" onClick={onSubmit}>提交</button>
-      {submitted && <p style={{ marginTop: '1rem' }}>{submitted}</p>}
-    </main>
+    <div style={{ background: 'var(--page)', minHeight: '100vh' }}>
+      {demo && (
+        <div style={{ background: 'var(--brand-weak)', color: 'var(--brand)', textAlign: 'center', padding: '6px 12px', fontSize: 12 }}>
+          演示数据(未连接后端)
+        </div>
+      )}
+      {state.phase === 'fill' ? (
+        <Fill schema={schema} state={state} dispatch={dispatch} />
+      ) : (
+        <Done rows={state.submittedRows} dispatch={dispatch} />
+      )}
+    </div>
   );
 }

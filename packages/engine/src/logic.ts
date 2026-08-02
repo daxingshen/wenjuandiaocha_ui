@@ -16,7 +16,14 @@ export interface EvalResult {
 
 /** 判断单个条件是否成立。空值/未作答语义集中在此,是前后端最易漂移处。 */
 export function evalCondition(cond: Condition, answers: Answers): boolean {
-  const a = answers[cond.qid];
+  // 有 subId 时钻入矩阵子行:答案形如 { 子行id: 选项value };该题未答或非对象则子行取 undefined。
+  const raw = answers[cond.qid];
+  const a =
+    cond.subId !== undefined
+      ? raw && typeof raw === 'object' && !Array.isArray(raw)
+        ? (raw as Record<string, unknown>)[cond.subId]
+        : undefined
+      : raw;
   const answered = a !== undefined && a !== null && a !== '';
   switch (cond.op) {
     case 'answered':

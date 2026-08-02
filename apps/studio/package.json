@@ -14,8 +14,11 @@
     "@xingjuan/engine": "workspace:*",
     "@xingjuan/question-types": "workspace:*",
     "@xingjuan/ui": "workspace:*",
+    "echarts": "^6.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.18.2",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@types/react": "^19.0.1",

@@ -7,6 +7,8 @@ import type { QuestionTypeHandler, Question, NormalizedRow } from '@xingjuan/eng
 /** 单选题的 props 结构。核心层不认识它,只有本插件解释。 */
 export interface SingleChoiceProps {
   options: Array<{ value: string; label: string }>;
+  /** 选项随机排序(作答态每份问卷固定一次;编辑预览不洗) */
+  randomize?: boolean;
 }
 
 function readProps(q: Question): SingleChoiceProps {
@@ -33,4 +35,8 @@ export const singleChoiceHandler: QuestionTypeHandler = {
     if (typeof answer !== 'string' || answer === '') return [];
     return [{ qid: question.id, value: answer }];
   },
+  // 逻辑引用:选项作为条件值候选(条件走下拉而非手打)。
+  logicRef: (question: Question) => ({
+    values: readProps(question).options.map((o) => ({ value: o.value, label: o.label })),
+  }),
 };

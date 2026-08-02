@@ -65,6 +65,22 @@
       ],
       "answers": {},
       "expectHidden": []
+    },
+    {
+      "name": "矩阵子行 subId:钻取某行答案命中 → 隐藏",
+      "rules": [
+        { "id": "r1", "conditions": [{ "qid": "q3", "subId": "ease", "op": "eq", "value": "bad" }], "combinator": "AND", "action": { "type": "hide", "target": "q4" } }
+      ],
+      "answers": { "q3": { "ease": "bad", "stability": "good" } },
+      "expectHidden": ["q4"]
+    },
+    {
+      "name": "矩阵子行 subId:该行未作答 → answered 为假,不隐藏",
+      "rules": [
+        { "id": "r1", "conditions": [{ "qid": "q3", "subId": "ease", "op": "answered", "value": null }], "combinator": "AND", "action": { "type": "hide", "target": "q4" } }
+      ],
+      "answers": { "q3": { "stability": "good" } },
+      "expectHidden": []
     }
   ]
 }

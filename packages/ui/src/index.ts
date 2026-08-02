@@ -4,3 +4,5 @@
  * 通用 React 组件(btn/badge/stat-tile 等)后续在此补充。
  */
 export const UI_VERSION = '0.0.0';
+
+export { getTheme, applyTheme, toggleTheme, initTheme, type Theme } from './theme.js';

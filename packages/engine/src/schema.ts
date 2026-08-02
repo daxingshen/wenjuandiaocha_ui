@@ -45,6 +45,8 @@ export interface SurveySchema {
 export interface Condition {
   /** 被比较的题目 id */
   qid: string;
+  /** 矩阵子行 id:引用某题的某一子行(如「Q3.易用性」);标量题省略 */
+  subId?: string;
   op: ConditionOp;
   /** 比较值。语义由 op 决定 */
   value: unknown;
