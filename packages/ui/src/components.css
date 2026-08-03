@@ -149,16 +149,8 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .logic-box { background: color-mix(in srgb, var(--s7) 8%, transparent); border: 1px solid color-mix(in srgb, var(--s7) 25%, transparent); border-radius: 8px; padding: 12px; font-size: 12.5px; color: var(--s7); }
 .logic-box b { display: block; margin-bottom: 4px; color: var(--ink); }
 
-/* 题型设置子块(选项/行列编辑,右栏内) */
-.set-group h5 { font-size: 12px; font-weight: 600; color: var(--ink-2); margin: 16px 0 8px; }
-.opt-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
-.opt-row input { flex: 1; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: var(--surface-2); color: var(--ink); }
-.opt-row input:focus { outline: none; border-color: var(--brand); }
-.opt-row .del { width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--ink-muted); flex: none; }
-.opt-row .del:hover { border-color: var(--critical); color: var(--critical); }
-.add-opt { font-size: 13px; color: var(--brand); font-weight: 600; padding: 4px 0; }
-.dual-field { display: flex; gap: 8px; }
-.dual-field .field { flex: 1; }
+/* 题型设置子块(选项/行列编辑)已随 @xingjuan/question-types 走(见其 editor.css),
+   使题型库可整体迁移;此处不再重复定义 set-group/opt-row/add-opt/dual-field。 */
 
 /* 编辑器内选项/量表/矩阵预览 */
 .opt { display: flex; align-items: center; gap: 10px; padding: 7px 0; color: var(--ink-2); }

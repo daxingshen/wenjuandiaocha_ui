@@ -1,6 +1,7 @@
 /** 量表题编辑态:编刻度范围 + 两端锚点文案。题干/必答/题型由 SettingsPanel 统一管。 */
 import type { EditorProps } from '../types.js';
 import type { ScaleProps } from './handler.js';
+import '../editor.css';
 
 export function ScaleEditor({ question, onChange }: EditorProps) {
   const p = question.props as Partial<ScaleProps>;

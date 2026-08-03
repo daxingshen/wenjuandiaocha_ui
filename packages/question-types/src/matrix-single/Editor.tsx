@@ -1,6 +1,7 @@
 /** 矩阵单选编辑态:编子行(增删改)+ 列(增删改)。题干/必答/题型由 SettingsPanel 统一管。 */
 import type { EditorProps } from '../types.js';
 import type { MatrixSingleProps } from './handler.js';
+import '../editor.css';
 
 export function MatrixSingleEditor({ question, onChange }: EditorProps) {
   const p = question.props as Partial<MatrixSingleProps>;
