@@ -60,6 +60,9 @@ importers:
       '@xingjuan/question-types':
         specifier: workspace:*
         version: link:../../packages/question-types
+      '@xingjuan/question-types-editors':
+        specifier: workspace:*
+        version: link:../../packages/question-types-editors
       '@xingjuan/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -122,6 +125,25 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9
+
+  packages/question-types-editors:
+    dependencies:
+      '@xingjuan/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@xingjuan/question-types':
+        specifier: workspace:*
+        version: link:../question-types
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.1
+        version: 19.2.18
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
 
   packages/ui:
     devDependencies:

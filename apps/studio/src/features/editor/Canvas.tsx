@@ -3,7 +3,7 @@
  * 做实时预览——与作答端同一份渲染,所见即所得。点击选中高亮,工具条 ↑↓⧉🗑 调 store。
  * 用原型 .paper / .q-block 类(ui/components.css)。外层 .ed-center 由 Editor 提供。
  */
-import { getUI } from '@xingjuan/question-types';
+import { getAnswer } from '@xingjuan/question-types';
 import { useEditorStore } from './useEditorStore.js';
 
 export function Canvas() {
@@ -27,7 +27,7 @@ export function Canvas() {
       )}
 
       {schema.questions.map((q, i) => {
-        const ui = getUI(q.type);
+        const Answer = getAnswer(q.type);
         const selected = q.id === selectedQid;
         const hasLogic = schema.rules.some((r) => r.action.target === q.id);
         return (
@@ -47,8 +47,8 @@ export function Canvas() {
               <span>{q.title}</span>
               {hasLogic && <span className="logic-tag">关联逻辑</span>}
             </div>
-            {ui ? (
-              <ui.Answer question={q} value={undefined} onChange={() => {}} disabled />
+            {Answer ? (
+              <Answer question={q} value={undefined} onChange={() => {}} disabled />
             ) : (
               <p style={{ color: 'var(--critical)' }}>题型 {q.type} 未注册</p>
             )}

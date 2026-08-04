@@ -1,6 +1,5 @@
 /** 单项填空编辑态:编格式校验 + 最大长度。题干/必答/题型由 SettingsPanel 统一管。 */
-import type { EditorProps } from '../types.js';
-import type { TextInputProps, TextFormat } from './handler.js';
+import type { EditorProps, TextInputProps, TextFormat } from '@xingjuan/question-types';
 import '../editor.css';
 
 export function TextInputEditor({ question, onChange }: EditorProps) {

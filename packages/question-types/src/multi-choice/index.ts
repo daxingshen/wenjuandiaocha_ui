@@ -1,13 +1,12 @@
-/** 多选题插件:把 engine handler 与 UI 组件登记到各自注册表。 */
+/** 多选题插件:登记 engine handler(行为)与作答组件。编辑器在 editors 包。 */
 import { register } from '@xingjuan/engine';
-import { registerUI } from '../types.js';
+import { registerAnswer } from '../types.js';
 import { multiChoiceHandler } from './handler.js';
 import { MultiChoiceAnswer } from './Answer.js';
-import { MultiChoiceEditor } from './Editor.js';
 
 export function registerMultiChoice(): void {
   register(multiChoiceHandler);
-  registerUI({ type: 'multi-choice', Answer: MultiChoiceAnswer, Editor: MultiChoiceEditor });
+  registerAnswer('multi-choice', MultiChoiceAnswer);
 }
 
 export { multiChoiceHandler } from './handler.js';

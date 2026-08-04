@@ -9,7 +9,7 @@
 import { useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { evaluate } from '@xingjuan/engine';
-import { getUI } from '@xingjuan/question-types';
+import { getAnswer } from '@xingjuan/question-types';
 import { RequireAuth } from '../features/auth/RequireAuth.js';
 import { TopBar } from '../components/TopBar.js';
 import { Editor } from '../features/editor/Editor.js';
@@ -35,10 +35,10 @@ function Preview() {
       {schema.questions
         .filter((q) => !hidden.has(q.id))
         .map((q) => {
-          const ui = getUI(q.type);
+          const Answer = getAnswer(q.type);
           return (
             <div key={q.id} style={{ margin: '12px 0', padding: 16, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12 }}>
-              {ui ? <ui.Answer question={q} value={undefined} onChange={() => {}} disabled /> : <p>未知题型:{q.type}</p>}
+              {Answer ? <Answer question={q} value={undefined} onChange={() => {}} disabled /> : <p>未知题型:{q.type}</p>}
             </div>
           );
         })}

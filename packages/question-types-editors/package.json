@@ -1,0 +1,27 @@
+{
+  "name": "@xingjuan/question-types-editors",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "题型编辑器(studio 专属):每种题型的编辑态设置组件,反向登记到 question-types 的 editorRegistry",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@xingjuan/engine": "workspace:*",
+    "@xingjuan/question-types": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.1",
+    "react": "^19.0.0",
+    "typescript": "^5.7.2"
+  }
+}

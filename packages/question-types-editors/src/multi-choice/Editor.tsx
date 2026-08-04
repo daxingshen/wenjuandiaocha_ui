@@ -1,7 +1,6 @@
 /** 多选题编辑态:编选项(增删改)+ min/max + 选项随机排序。题干/必答/题型由 SettingsPanel 统一管。 */
-import type { EditorProps } from '../types.js';
+import type { EditorProps, MultiChoiceProps } from '@xingjuan/question-types';
 import '../editor.css';
-import type { MultiChoiceProps } from './handler.js';
 
 export function MultiChoiceEditor({ question, onChange }: EditorProps) {
   const p = question.props as Partial<MultiChoiceProps>;

@@ -1,6 +1,5 @@
 /** 单选题编辑态:编选项(增删改)+ 选项随机排序。题干/必答/题型由 SettingsPanel 统一管。 */
-import type { EditorProps } from '../types.js';
-import type { SingleChoiceProps } from './handler.js';
+import type { EditorProps, SingleChoiceProps } from '@xingjuan/question-types';
 import '../editor.css';
 
 export function SingleChoiceEditor({ question, onChange }: EditorProps) {

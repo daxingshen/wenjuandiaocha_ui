@@ -1,10 +1,9 @@
-/* 题型编辑器(studio 右栏设置面板)共享样式。
-   移植自原 @xingjuan/ui components.css,随 question-types 包走 —— 让题型库可整体迁移/开源。
+/* 题型编辑器(studio 右栏设置面板)共享样式。随 question-types-editors 包走 —— 让编辑器与作答端产物物理隔离。
    token 用 var(--x, 亮色值) fallback 写法:独立使用时走亮色默认,放进提供同名 token 的宿主时自动跟随主题(含暗色)。 */
 
 /* ============ 设置面板通用行(field / toggle-row / sw) ============
-   注:这三类在本仓 studio 的 SettingsPanel / login 也用,故 components.css 保留同名定义;
-   此处复制一份是为让 question-types 独立可用,二者应保持一致。 */
+   注:这三类在本仓 studio 的 SettingsPanel / login 也用,故 ui/components.css 保留同名定义;
+   此处复制一份是为让 editors 包独立可用,二者应保持一致。 */
 .field { margin-bottom: 16px; }
 .field label { display: block; font-size: 12.5px; color: var(--ink-2, #52514e); font-weight: 500; margin-bottom: 6px; }
 .field input[type=text], .field input[type=password], .field input[type=number], .field select, .field textarea {

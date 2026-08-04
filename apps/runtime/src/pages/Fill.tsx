@@ -7,7 +7,7 @@
  */
 import { useMemo } from 'react';
 import { evaluate, normalizeSurvey, validateSurvey, type SurveySchema } from '@xingjuan/engine';
-import { getUI } from '@xingjuan/question-types';
+import { getAnswer } from '@xingjuan/question-types';
 import { submitAnswers } from '../api/client.js';
 import type { FillAction, FillState } from '../useFill.js';
 
@@ -56,7 +56,7 @@ export function Fill({
 
       <div className="a-body">
         {visible.map((q, i) => {
-          const ui = getUI(q.type);
+          const Answer = getAnswer(q.type);
           const err = errorOf(q.id);
           return (
             <div key={q.id} id={`q-${q.id}`} className="a-q" style={err ? { borderColor: 'var(--critical)' } : undefined}>
@@ -64,8 +64,8 @@ export function Fill({
                 {q.required && <span className="req">* </span>}
                 <span className="no">Q{i + 1}</span> {q.title}
               </div>
-              {ui ? (
-                <ui.Answer question={q} value={answers[q.id]} onChange={(v) => dispatch({ type: 'setAnswer', qid: q.id, value: v })} />
+              {Answer ? (
+                <Answer question={q} value={answers[q.id]} onChange={(v) => dispatch({ type: 'setAnswer', qid: q.id, value: v })} />
               ) : (
                 <p style={{ color: 'var(--critical)' }}>未知题型:{q.type}</p>
               )}

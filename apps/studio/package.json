@@ -13,6 +13,7 @@
   "dependencies": {
     "@xingjuan/engine": "workspace:*",
     "@xingjuan/question-types": "workspace:*",
+    "@xingjuan/question-types-editors": "workspace:*",
     "@xingjuan/ui": "workspace:*",
     "echarts": "^6.1.0",
     "react": "^19.0.0",

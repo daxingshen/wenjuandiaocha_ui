@@ -4,7 +4,7 @@
  * 用原型 .field / .toggle-row / .sw 类。外层 .ed-right 由 Editor 提供。
  */
 import { getHandler, listHandlers } from '@xingjuan/engine';
-import { getUI } from '@xingjuan/question-types';
+import { getEditor } from '@xingjuan/question-types';
 import { useEditorStore } from './useEditorStore.js';
 import { LogicRules } from './LogicRules.js';
 
@@ -16,7 +16,7 @@ export function SettingsPanel() {
   const question = schema?.questions.find((q) => q.id === selectedQid) ?? null;
   if (!question) return <p style={{ color: 'var(--ink-muted)' }}>选中一道题以编辑设置</p>;
 
-  const ui = getUI(question.type);
+  const TypeEditor = getEditor(question.type);
 
   // 切换题型:旧 props 对新题型无意义,用新题型的 defaultProps 重置
   const changeType = (type: string) => {
@@ -55,9 +55,9 @@ export function SettingsPanel() {
         />
       </div>
 
-      {ui ? (
+      {TypeEditor ? (
         <div style={{ marginTop: 14 }}>
-          <ui.Editor question={question} onChange={(patch) => updateQuestion(question.id, patch)} />
+          <TypeEditor question={question} onChange={(patch) => updateQuestion(question.id, patch)} />
         </div>
       ) : (
         <p style={{ color: 'var(--critical)' }}>题型 {question.type} 无编辑器</p>
