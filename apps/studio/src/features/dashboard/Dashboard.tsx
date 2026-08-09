@@ -2,10 +2,11 @@
  * 问卷看板:应用外壳(顶栏 + 左侧导航 + 主视图),对齐原型。
  * 类型只是筛选维度,非独立系统(UI 文档 §3.2「一套引擎」)。后端未接:列表用示例数据。
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../auth/useAuthStore.js';
 import { TopBar } from '../../components/TopBar.js';
+import { listSurveys, createSurvey, type SurveyListItem } from '../../api/surveys.js';
 
 /** 类型 → 色板槽位 + 图标(对照原型 typeMeta / 类型色映射 UI 文档 §2.1)。 */
 const TYPE_META: Record<string, { color: string; ic: string; label: string }> = {
@@ -23,14 +24,19 @@ const STATUS_META: Record<string, { cls: string; label: string }> = {
   closed: { cls: 'closed', label: '已截止' },
 };
 
-/** 示例问卷(对照原型 surveys)。后端 listSurveys 接通后替换。 */
-const DEMO_LIST = [
-  { id: 'a3f9', title: '2026 年产品满意度调研问卷', type: 'survey', status: 'live', n: 1284, done: '86%', updated: '2 小时前' },
-  { id: '7k2m', title: '新员工入职 Java 基础在线考试', type: 'exam', status: 'live', n: 342, done: '100%', updated: '昨天' },
-  { id: 'p8w1', title: '年度最佳团队评选投票', type: 'vote', status: 'live', n: 5621, done: '—', updated: '3 天前' },
-  { id: 'r2c5', title: '技术沙龙线下活动报名表', type: 'form', status: 'closed', n: 198, done: '—', updated: '上周' },
-  { id: 'z0x3', title: 'Q3 管理者 360 度反馈评估', type: 'review360', status: 'draft', n: 0, done: '—', updated: '刚刚' },
-];
+/** 相对时间显示(简版):把 ISO 时间转成「N 分钟/小时/天前」。 */
+function relTime(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '';
+  const diff = Date.now() - t;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return '刚刚';
+  if (min < 60) return `${min} 分钟前`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} 小时前`;
+  const d = Math.floor(h / 24);
+  return `${d} 天前`;
+}
 
 const FILTERS = [
   { key: 'all', label: '全部' },
@@ -46,8 +52,35 @@ export function Dashboard() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const [filter, setFilter] = useState('all');
+  const [surveys, setSurveys] = useState<SurveyListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [creating, setCreating] = useState(false);
 
-  const list = DEMO_LIST.filter((s) => {
+  useEffect(() => {
+    let alive = true;
+    listSurveys()
+      .then((rows) => alive && (setSurveys(rows), setError('')))
+      .catch(() => alive && setError('加载问卷失败'))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // 新建:先 POST 建空草稿拿真实 id,再跳编辑(方案 A)。
+  const onCreate = async () => {
+    setCreating(true);
+    try {
+      const id = await createSurvey();
+      navigate(`/survey/${id}/edit`);
+    } catch {
+      setError('新建失败');
+      setCreating(false);
+    }
+  };
+
+  const list = surveys.filter((s) => {
     if (filter === 'all') return true;
     if (filter === 'live' || filter === 'draft') return s.status === filter;
     return s.type === filter;
@@ -124,14 +157,21 @@ export function Dashboard() {
               <option value="created">按创建时间</option>
             </select>
             <input className="search2" placeholder="🔍 搜索问卷…" />
-            <button className="btn primary" onClick={() => navigate('/survey/new/edit')}>＋ 新建问卷</button>
+            <button className="btn primary" disabled={creating} onClick={onCreate}>
+              {creating ? '创建中…' : '＋ 新建问卷'}
+            </button>
           </div>
 
           {/* 纵向列表 */}
           <div className="slist">
+            {loading && <p style={{ color: 'var(--ink-muted)', padding: 16 }}>加载中…</p>}
+            {error && !loading && <p style={{ color: 'var(--critical)', padding: 16 }}>{error}</p>}
+            {!loading && !error && list.length === 0 && (
+              <p style={{ color: 'var(--ink-muted)', padding: 16 }}>还没有问卷,点右上「新建问卷」开始。</p>
+            )}
             {list.map((s) => {
-              const m = TYPE_META[s.type]!;
-              const st = STATUS_META[s.status]!;
+              const m = TYPE_META[s.type] ?? { color: 'var(--s1)', ic: '问', label: s.type };
+              const st = STATUS_META[s.status] ?? { cls: 'draft', label: s.status };
               return (
                 <div key={s.id} className="srow">
                   <div className="stripe" style={{ background: m.color }} />
@@ -145,17 +185,7 @@ export function Dashboard() {
                         </div>
                         <div className="m">
                           <span className="id">ID {s.id}</span>
-                          <span>更新于 {s.updated}</span>
-                        </div>
-                      </div>
-                      <div className="stats">
-                        <div className="stat">
-                          <div className="num">{s.n.toLocaleString()}</div>
-                          <div className="lab">作答数</div>
-                        </div>
-                        <div className="stat">
-                          <div className="num">{s.done}</div>
-                          <div className="lab">完成率</div>
+                          <span>更新于 {relTime(s.updatedAt)}</span>
                         </div>
                       </div>
                     </div>

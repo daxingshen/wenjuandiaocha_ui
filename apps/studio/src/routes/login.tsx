@@ -6,17 +6,30 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toggleTheme } from '@xingjuan/ui';
 import { useAuthStore } from '../features/auth/useAuthStore.js';
+import { login as apiLogin } from '../api/auth.js';
 
 export function LoginRoute() {
   const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
   const [account, setAccount] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // demo:任意账号直通;真实鉴权待后端
-    login({ id: 'u_demo', name: account || '演示用户', level: 'pro' });
-    navigate('/home', { replace: true });
+    setError('');
+    setBusy(true);
+    try {
+      // 真实鉴权:后端校验账密、下发 session cookie,返回用户信息填入 store。
+      const user = await apiLogin(account, password);
+      login(user);
+      navigate('/home', { replace: true });
+    } catch {
+      setError('账号或密码错误');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -52,10 +65,11 @@ export function LoginRoute() {
           </div>
           <div className="field">
             <label>密码</label>
-            <input type="password" placeholder="••••••••" />
+            <input type="password" value={password} placeholder="••••••••" onChange={(e) => setPassword(e.target.value)} />
           </div>
-          <button type="submit" className="btn primary" style={{ width: '100%', justifyContent: 'center', padding: 11 }}>
-            登录
+          {error && <p style={{ color: 'var(--critical)', fontSize: 13, margin: '0 0 8px' }}>{error}</p>}
+          <button type="submit" className="btn primary" disabled={busy} style={{ width: '100%', justifyContent: 'center', padding: 11 }}>
+            {busy ? '登录中…' : '登录'}
           </button>
         </form>
       </div>
