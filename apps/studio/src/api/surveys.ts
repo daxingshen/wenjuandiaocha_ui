@@ -21,9 +21,12 @@ export async function listSurveys(): Promise<SurveyListItem[]> {
   return apiGet<SurveyListItem[]>('/surveys');
 }
 
-/** 新建空问卷,返回其后端生成的 id(方案 A:先建后跳)。 */
-export async function createSurvey(): Promise<string> {
-  const { id } = await apiSend<{ id: string }>('/surveys', 'POST');
+/**
+ * 首存落库:把内存草稿整份 POST 给后端,后端分配并返回 id(不保存则不调用 → 后端零写入)。
+ * 之后的保存走 saveSurvey(PUT)。
+ */
+export async function createSurvey(schema: SurveySchema): Promise<string> {
+  const { id } = await apiSend<{ id: string }>('/surveys', 'POST', schema);
   return id;
 }
 
@@ -41,4 +44,14 @@ export async function saveSurvey(schema: SurveySchema): Promise<void> {
 export async function publishSurvey(id: string): Promise<number> {
   const { version } = await apiSend<{ ok: boolean; version: number }>(`/surveys/${id}/publish`, 'POST');
   return version;
+}
+
+/** 结束回收(live → closed)。仅进行中可结束,否则后端 409。 */
+export async function closeSurvey(id: string): Promise<void> {
+  await apiSend<{ ok: boolean }>(`/surveys/${id}/close`, 'POST');
+}
+
+/** 重新打开(closed → live),复用上次发布的版本快照。仅已结束且曾发布过可重开,否则后端 409。 */
+export async function reopenSurvey(id: string): Promise<void> {
+  await apiSend<{ ok: boolean }>(`/surveys/${id}/reopen`, 'POST');
 }

@@ -1,6 +1,6 @@
 /**
  * /survey/:id/:tab —— 专注工作区。全局顶栏单行(对齐原型):Logo + 标题 + 状态徽章
- * + 预览/保存/取消编辑。tab 导航条已去除,tab 切换靠路由(看板入口按钮 + URL 直达)。
+ * + 预览/保存/返回。tab 导航条已去除,tab 切换靠路由(看板入口按钮 + URL 直达)。
  *
  * 编辑→Editor(产品心脏);分析→Analysis(占位);预览→复用 getUI().Answer 渲染
  * 编辑器 store 的 schema——studio 不 import runtime,靠共享题型组件(印证内核共享、外壳不同);
@@ -12,10 +12,17 @@ import { evaluate } from '@xingjuan/engine';
 import { getAnswer } from '@xingjuan/question-types';
 import { RequireAuth } from '../features/auth/RequireAuth.js';
 import { TopBar } from '../components/TopBar.js';
+import { SaveDialog } from '../components/SaveDialog.js';
 import { Editor } from '../features/editor/Editor.js';
 import { Analysis } from '../features/analysis/Analysis.js';
 import { useEditorStore } from '../features/editor/useEditorStore.js';
-import { getSurvey, saveSurvey, publishSurvey } from '../api/surveys.js';
+import type { SurveySchema } from '@xingjuan/engine';
+import { getSurvey, saveSurvey, createSurvey, publishSurvey } from '../api/surveys.js';
+
+/** 新建时的空白内存草稿(未落库,首存前只存在于编辑器 store)。 */
+function emptyDraft(): SurveySchema {
+  return { id: 'new', type: 'survey', title: '未命名问卷', version: 1, questions: [], rules: [] };
+}
 
 const TABS = [
   { key: 'edit', label: '编辑' },
@@ -52,14 +59,22 @@ export function SurveyRoute() {
   const navigate = useNavigate();
   const load = useEditorStore((s) => s.load);
   const schema = useEditorStore((s) => s.schema);
+  const setTitle = useEditorStore((s) => s.setTitle);
 
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
-  // 按 :id 从后端载入草稿 schema 进编辑器 store(替换种子)。id 变才重载。
+  // :id==='new' 是内存草稿态:不调后端(避免 404),直接载入空白草稿,首存时才落库。
+  // 其余按 :id 从后端载入草稿 schema 进编辑器 store。id 变才重载。
   useEffect(() => {
     if (!id) return;
+    if (id === 'new') {
+      load(emptyDraft());
+      setLoadState('ready');
+      return;
+    }
     let alive = true;
     setLoadState('loading');
     getSurvey(id)
@@ -77,13 +92,33 @@ export function SurveyRoute() {
   const isTab = (t: string | undefined): t is TabKey => TABS.some((x) => x.key === t);
   if (!isTab(tab)) return <Navigate to={`/survey/${id}/edit`} replace />;
 
-  const onSave = async () => {
+  // 首存:内存草稿(id==='new')POST 落库拿真实 id,写回 store 并把 URL 换成真实 id(replace,不留 new 历史)。
+  // 返回落库后的真实 id 供发布等后续动作复用;非新建走 PUT。
+  const persist = async (): Promise<string> => {
+    if (!schema) throw new Error('no schema');
+    if (id === 'new') {
+      const realId = await createSurvey(schema);
+      load({ ...schema, id: realId });
+      navigate(`/survey/${realId}/edit`, { replace: true });
+      return realId;
+    }
+    await saveSurvey(schema);
+    return id!;
+  };
+
+  // 弹窗的「保存」/「保存并返回」共用此逻辑;back=true 时存成功后回看板。
+  const onSave = async (back: boolean) => {
     if (!schema) return;
     setSaving(true);
     setNotice('');
     try {
-      await saveSurvey(schema);
-      setNotice('已保存');
+      await persist();
+      setSaveDialogOpen(false);
+      if (back) {
+        navigate('/home');
+      } else {
+        setNotice('已保存');
+      }
     } catch {
       setNotice('保存失败');
     } finally {
@@ -92,12 +127,12 @@ export function SurveyRoute() {
   };
 
   const onPublish = async () => {
-    if (!id || !schema) return;
+    if (!schema) return;
     setSaving(true);
     setNotice('');
     try {
-      await saveSurvey(schema); // 先存草稿再发布,确保快照是最新
-      const version = await publishSurvey(id);
+      const realId = await persist(); // 先存草稿(含首存落库)再发布,确保快照最新
+      const version = await publishSurvey(realId);
       setNotice(`已发布 v${version}`);
     } catch {
       setNotice('发布失败');
@@ -110,15 +145,25 @@ export function SurveyRoute() {
     <RequireAuth>
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <TopBar
-          center={<span className="ftitle" style={{ marginLeft: 12 }}>{schema?.title ?? `问卷 ${id}`}</span>}
+          center={
+            <input
+              className="ftitle"
+              style={{ marginLeft: 12, border: 'none', background: 'transparent', outline: 'none', font: 'inherit', color: 'inherit', minWidth: 200 }}
+              value={schema?.title ?? ''}
+              placeholder={`问卷 ${id}`}
+              disabled={loadState !== 'ready'}
+              onChange={(e) => setTitle(e.target.value)}
+              aria-label="问卷标题"
+            />
+          }
           actions={
             <>
               {notice && <span style={{ fontSize: 12, color: 'var(--ink-muted)', marginRight: 8 }}>{notice}</span>}
               <button className="btn sm" onClick={() => navigate(`/survey/${id}/preview`)}>预览</button>
-              <button className="btn primary sm" disabled={saving || loadState !== 'ready'} onClick={onSave}>
+              <button className="btn primary sm" disabled={saving || loadState !== 'ready'} onClick={() => setSaveDialogOpen(true)}>
                 {saving ? '保存中…' : '保存'}
               </button>
-              <button className="btn sm" onClick={() => navigate('/home')}>取消编辑</button>
+              <button className="btn sm" onClick={() => navigate('/home')}>返回</button>
             </>
           }
         />
@@ -147,6 +192,14 @@ export function SurveyRoute() {
             </>
           )}
         </div>
+
+        <SaveDialog
+          open={saveDialogOpen}
+          saving={saving}
+          onSave={() => onSave(false)}
+          onSaveAndBack={() => onSave(true)}
+          onCancel={() => setSaveDialogOpen(false)}
+        />
       </div>
     </RequireAuth>
   );

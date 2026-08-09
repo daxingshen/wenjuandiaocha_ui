@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../auth/useAuthStore.js';
 import { TopBar } from '../../components/TopBar.js';
-import { listSurveys, createSurvey, type SurveyListItem } from '../../api/surveys.js';
+import { listSurveys, closeSurvey, reopenSurvey, type SurveyListItem } from '../../api/surveys.js';
 
 /** 类型 → 色板槽位 + 图标(对照原型 typeMeta / 类型色映射 UI 文档 §2.1)。 */
 const TYPE_META: Record<string, { color: string; ic: string; label: string }> = {
@@ -46,6 +46,7 @@ const FILTERS = [
   { key: 'form', label: '报名' },
   { key: 'live', label: '进行中' },
   { key: 'draft', label: '草稿' },
+  { key: 'closed', label: '已结束' },
 ];
 
 export function Dashboard() {
@@ -55,7 +56,13 @@ export function Dashboard() {
   const [surveys, setSurveys] = useState<SurveyListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [creating, setCreating] = useState(false);
+  const [busyId, setBusyId] = useState('');
+
+  const refresh = () => {
+    return listSurveys()
+      .then((rows) => (setSurveys(rows), setError('')))
+      .catch(() => setError('加载问卷失败'));
+  };
 
   useEffect(() => {
     let alive = true;
@@ -68,21 +75,36 @@ export function Dashboard() {
     };
   }, []);
 
-  // 新建:先 POST 建空草稿拿真实 id,再跳编辑(方案 A)。
-  const onCreate = async () => {
-    setCreating(true);
+  // 新建:不再先落库,进内存草稿态编辑器(/survey/new),用户点保存才首存落库(零写入直到保存)。
+  const onCreate = () => navigate('/survey/new/edit');
+
+  // 结束回收 / 重新打开:调后端状态机,成功后重拉列表刷新徽章。
+  const onClose = async (id: string) => {
+    setBusyId(id);
     try {
-      const id = await createSurvey();
-      navigate(`/survey/${id}/edit`);
+      await closeSurvey(id);
+      await refresh();
     } catch {
-      setError('新建失败');
-      setCreating(false);
+      setError('结束失败');
+    } finally {
+      setBusyId('');
+    }
+  };
+  const onReopen = async (id: string) => {
+    setBusyId(id);
+    try {
+      await reopenSurvey(id);
+      await refresh();
+    } catch {
+      setError('重新打开失败');
+    } finally {
+      setBusyId('');
     }
   };
 
   const list = surveys.filter((s) => {
     if (filter === 'all') return true;
-    if (filter === 'live' || filter === 'draft') return s.status === filter;
+    if (filter === 'live' || filter === 'draft' || filter === 'closed') return s.status === filter;
     return s.type === filter;
   });
 
@@ -157,8 +179,8 @@ export function Dashboard() {
               <option value="created">按创建时间</option>
             </select>
             <input className="search2" placeholder="🔍 搜索问卷…" />
-            <button className="btn primary" disabled={creating} onClick={onCreate}>
-              {creating ? '创建中…' : '＋ 新建问卷'}
+            <button className="btn primary" onClick={onCreate}>
+              ＋ 新建问卷
             </button>
           </div>
 
@@ -193,6 +215,21 @@ export function Dashboard() {
                       <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/edit`)}>✏️ 编辑设计</button>
                       <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/publish`)}>📤 发送分享</button>
                       <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/analyze`)}>📊 分析下载</button>
+                      {s.status === 'live' && (
+                        <button className="btn sm" disabled={busyId === s.id} onClick={() => onClose(s.id)}>
+                          {busyId === s.id ? '处理中…' : '⏹ 结束回收'}
+                        </button>
+                      )}
+                      {s.status === 'closed' && (
+                        <button
+                          className="btn sm"
+                          disabled={busyId === s.id}
+                          title="将恢复上次发布的版本供作答"
+                          onClick={() => onReopen(s.id)}
+                        >
+                          {busyId === s.id ? '处理中…' : '↻ 重新打开'}
+                        </button>
+                      )}
                       <div className="spring" />
                       <button className="btn sm ghost" title="更多">⋯</button>
                     </div>
