@@ -91,19 +91,22 @@ export function SingleChoiceAnswer({ question, value, onChange, disabled }: Answ
                 />
               )}
               {opt.fill?.enabled && checked && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                  {opt.fill.required && <span className="fill-req" aria-label="必填">*</span>}
-                  <input
-                    type="text"
-                    className="opt-fill-in"
-                    placeholder={opt.fill.placeholder ?? '请填写…'}
-                    value={curText}
-                    disabled={disabled}
-                    required={opt.fill.required}
-                    aria-required={opt.fill.required}
-                    onChange={(e) => onChange({ value: opt.value, text: e.target.value })}
-                    style={{ flex: 1 }}
-                  />
+                <span className="opt-fill-answer" style={{ display: 'block', marginTop: 4 }}>
+                  {opt.fill.desc && <span className="opt-fill-desc">{opt.fill.desc}</span>}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {opt.fill.required && <span className="fill-req" aria-label="必填">*</span>}
+                    <input
+                      type="text"
+                      className="opt-fill-in"
+                      placeholder={opt.fill.placeholder ?? '请填写…'}
+                      value={curText}
+                      disabled={disabled}
+                      required={opt.fill.required}
+                      aria-required={opt.fill.required}
+                      onChange={(e) => onChange({ value: opt.value, text: e.target.value })}
+                      style={{ flex: 1 }}
+                    />
+                  </span>
                 </span>
               )}
             </label>

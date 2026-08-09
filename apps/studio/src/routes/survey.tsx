@@ -6,15 +6,14 @@
  * 编辑器 store 的 schema——studio 不 import runtime,靠共享题型组件(印证内核共享、外壳不同);
  * 发布→占位。schema 现来自编辑器种子;:id 驱动加载与保存待后端 CRUD。
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { evaluate } from '@xingjuan/engine';
-import { getAnswer } from '@xingjuan/question-types';
 import { RequireAuth } from '../features/auth/RequireAuth.js';
 import { TopBar } from '../components/TopBar.js';
 import { SaveDialog } from '../components/SaveDialog.js';
 import { Editor } from '../features/editor/Editor.js';
 import { Analysis } from '../features/analysis/Analysis.js';
+import { Preview } from '../features/preview/Preview.js';
 import { useEditorStore } from '../features/editor/useEditorStore.js';
 import type { SurveySchema } from '@xingjuan/engine';
 import { getSurvey, saveSurvey, createSurvey, publishSurvey } from '../api/surveys.js';
@@ -31,28 +30,6 @@ const TABS = [
   { key: 'analyze', label: '数据分析' },
 ] as const;
 type TabKey = (typeof TABS)[number]['key'];
-
-/** 预览:用与作答端相同的题型 Answer 渲染当前 schema(只读),逻辑求值隐藏题。 */
-function Preview() {
-  const schema = useEditorStore((s) => s.schema);
-  const { hidden } = useMemo(() => evaluate(schema?.rules ?? [], {}), [schema?.rules]);
-  if (!schema) return <p>未加载问卷</p>;
-  return (
-    <div style={{ maxWidth: 480, margin: '0 auto' }}>
-      <h2 style={{ fontSize: 18 }}>{schema.title}</h2>
-      {schema.questions
-        .filter((q) => !hidden.has(q.id))
-        .map((q) => {
-          const Answer = getAnswer(q.type);
-          return (
-            <div key={q.id} style={{ margin: '12px 0', padding: 16, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12 }}>
-              {Answer ? <Answer question={q} value={undefined} onChange={() => {}} disabled /> : <p>未知题型:{q.type}</p>}
-            </div>
-          );
-        })}
-    </div>
-  );
-}
 
 export function SurveyRoute() {
   const { id, tab } = useParams<{ id: string; tab: string }>();
@@ -141,6 +118,44 @@ export function SurveyRoute() {
     }
   };
 
+  // 顶栏操作组按 tab 场景切换:每个 tab 只留与当下动作相符的按钮(对齐原型)。
+  const saveBtn = (
+    <button className="btn primary sm" disabled={saving || loadState !== 'ready'} onClick={() => setSaveDialogOpen(true)}>
+      {saving ? '保存中…' : '保存'}
+    </button>
+  );
+  const renderActions = () => {
+    switch (tab) {
+      case 'preview':
+        // 正在验证作答,动作是回去改或去发布——不再有冗余的「预览」
+        return (
+          <>
+            <button className="btn sm" onClick={() => navigate(`/survey/${id}/edit`)}>✎ 返回编辑</button>
+            <button className="btn primary sm" onClick={() => navigate(`/survey/${id}/publish`)}>🚀 发布问卷</button>
+          </>
+        );
+      case 'publish':
+        return (
+          <>
+            <button className="btn sm" onClick={() => navigate(`/survey/${id}/edit`)}>✎ 编辑</button>
+            {saveBtn}
+            <button className="btn sm" onClick={() => navigate('/home')}>返回</button>
+          </>
+        );
+      case 'analyze':
+        return <button className="btn sm" onClick={() => navigate('/home')}>返回</button>;
+      case 'edit':
+      default:
+        return (
+          <>
+            <button className="btn sm" onClick={() => navigate(`/survey/${id}/preview`)}>预览</button>
+            {saveBtn}
+            <button className="btn sm" onClick={() => navigate('/home')}>返回</button>
+          </>
+        );
+    }
+  };
+
   return (
     <RequireAuth>
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -159,11 +174,7 @@ export function SurveyRoute() {
           actions={
             <>
               {notice && <span style={{ fontSize: 12, color: 'var(--ink-muted)', marginRight: 8 }}>{notice}</span>}
-              <button className="btn sm" onClick={() => navigate(`/survey/${id}/preview`)}>预览</button>
-              <button className="btn primary sm" disabled={saving || loadState !== 'ready'} onClick={() => setSaveDialogOpen(true)}>
-                {saving ? '保存中…' : '保存'}
-              </button>
-              <button className="btn sm" onClick={() => navigate('/home')}>返回</button>
+              {renderActions()}
             </>
           }
         />
