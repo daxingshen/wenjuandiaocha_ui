@@ -5,10 +5,12 @@
  */
 import { getAnswer } from '@xingjuan/question-types';
 import { useEditorStore } from './useEditorStore.js';
+import { SingleChoiceCanvasEditor } from './SingleChoiceCanvasEditor.js';
 
 export function Canvas() {
   const schema = useEditorStore((s) => s.schema);
   const selectedQid = useEditorStore((s) => s.selectedQid);
+  const setTitle = useEditorStore((s) => s.setTitle);
   const selectQuestion = useEditorStore((s) => s.selectQuestion);
   const moveQuestion = useEditorStore((s) => s.moveQuestion);
   const removeQuestion = useEditorStore((s) => s.removeQuestion);
@@ -18,8 +20,13 @@ export function Canvas() {
   return (
     <div className="paper">
       <div className="paper-head">
-        <h2>{schema.title}</h2>
-        <p>点击题目编辑,从左侧题型面板添加新题。</p>
+        <input
+          className="paper-title-in"
+          value={schema.title}
+          placeholder="未命名问卷"
+          aria-label="问卷标题"
+          onChange={(e) => setTitle(e.target.value)}
+        />
       </div>
 
       {schema.questions.length === 0 && (
@@ -47,7 +54,10 @@ export function Canvas() {
               <span>{q.title}</span>
               {hasLogic && <span className="logic-tag">关联逻辑</span>}
             </div>
-            {Answer ? (
+            {q.type === 'single-choice' && selected ? (
+              // 选中的单选题:中栏走可内联编辑的选项列表(studio 专属),而非只读预览。
+              <SingleChoiceCanvasEditor question={q} />
+            ) : Answer ? (
               <Answer question={q} value={undefined} onChange={() => {}} disabled />
             ) : (
               <p style={{ color: 'var(--critical)' }}>题型 {q.type} 未注册</p>

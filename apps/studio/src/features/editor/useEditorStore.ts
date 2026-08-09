@@ -50,13 +50,19 @@ export interface EditorState {
   schema: SurveySchema | null;
   /** 当前选中的题目 id(决定右栏设置面板渲染谁) */
   selectedQid: string | null;
+  /** 当前选中的选项下标(选项级设置用;未选为 null)。切题时重置。 */
+  selectedOptIndex: number | null;
 
   /** 载入一份问卷(种子或后端返回) */
   load: (schema: SurveySchema) => void;
+  /** 修改问卷标题 */
+  setTitle: (title: string) => void;
   /** 追加一道指定题型的新题(props 取该题型 defaultProps),并选中它 */
   addQuestion: (type: string) => void;
-  /** 选中某题 */
+  /** 选中某题(重置选项选中) */
   selectQuestion: (qid: string) => void;
+  /** 选中某题的某个选项(右栏选项 tab 与中栏内联编辑双向同步);null 清除 */
+  selectOption: (index: number | null) => void;
   /** 局部更新某题(题干/必答/props) */
   updateQuestion: (qid: string, patch: Partial<Question>) => void;
   /** 删除某题 */
@@ -75,8 +81,11 @@ export interface EditorState {
 export const useEditorStore = create<EditorState>((set) => ({
   schema: seedSchema(),
   selectedQid: 'seed_1',
+  selectedOptIndex: null,
 
-  load: (schema) => set({ schema, selectedQid: schema.questions[0]?.id ?? null }),
+  load: (schema) => set({ schema, selectedQid: schema.questions[0]?.id ?? null, selectedOptIndex: null }),
+
+  setTitle: (title) => set((s) => (s.schema ? { schema: { ...s.schema, title } } : s)),
 
   addQuestion: (type) =>
     set((s) => {
@@ -95,7 +104,9 @@ export const useEditorStore = create<EditorState>((set) => ({
       };
     }),
 
-  selectQuestion: (qid) => set({ selectedQid: qid }),
+  selectQuestion: (qid) => set((s) => (s.selectedQid === qid ? s : { selectedQid: qid, selectedOptIndex: null })),
+
+  selectOption: (index) => set({ selectedOptIndex: index }),
 
   updateQuestion: (qid, patch) =>
     set((s) => {

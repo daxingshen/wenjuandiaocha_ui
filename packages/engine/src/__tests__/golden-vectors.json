@@ -81,6 +81,22 @@
       ],
       "answers": { "q3": { "stability": "good" } },
       "expectHidden": []
+    },
+    {
+      "name": "单选带填空:对象形答案 {value,text} 的 eq 按 value 命中 → 隐藏",
+      "rules": [
+        { "id": "r1", "conditions": [{ "qid": "q1", "op": "eq", "value": "other" }], "combinator": "AND", "action": { "type": "hide", "target": "q2" } }
+      ],
+      "answers": { "q1": { "value": "other", "text": "具体用途" } },
+      "expectHidden": ["q2"]
+    },
+    {
+      "name": "单选带填空:对象形 value 不匹配 → eq 不命中,不隐藏",
+      "rules": [
+        { "id": "r1", "conditions": [{ "qid": "q1", "op": "eq", "value": "other" }], "combinator": "AND", "action": { "type": "hide", "target": "q2" } }
+      ],
+      "answers": { "q1": { "value": "work", "text": "" } },
+      "expectHidden": []
     }
   ]
 }

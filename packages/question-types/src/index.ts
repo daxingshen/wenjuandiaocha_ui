@@ -28,7 +28,12 @@ export { getAnswer, registerAnswer, getEditor, registerEditor } from './types.js
 export type { AnswerProps, EditorProps } from './types.js';
 
 // 各题型 props 类型:供 editors 包(及其他消费者)标注编辑器,无需深入子路径。
-export type { SingleChoiceProps } from './single-choice/index.js';
+export type {
+  SingleChoiceProps,
+  SingleChoiceOption,
+  SingleChoiceArrange,
+  SingleChoiceFillAnswer,
+} from './single-choice/index.js';
 export type { MatrixSingleProps, MatrixSingleAnswer } from './matrix-single/index.js';
 export type { MultiChoiceProps } from './multi-choice/index.js';
 export type { ScaleProps } from './scale/index.js';

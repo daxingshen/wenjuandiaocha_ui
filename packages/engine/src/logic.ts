@@ -14,16 +14,34 @@ export interface EvalResult {
   hidden: Set<string>;
 }
 
+/**
+ * 从原始答案取出用于条件比较的标量。
+ * - 有 subId:钻入矩阵子行,答案形如 { 子行id: 选项value };未答或非对象则子行取 undefined。
+ * - 无 subId:若答案是「带自有 value 字段的对象」(如单选带填空 { value, text }),取其 value;
+ *   否则原样返回(裸 string/number、数组、矩阵整题对象等)。这样标量题带元数据后,
+ *   既有 eq/ne/answered 条件仍按选项 value 比较,不降级(见 03-design 决策1-A)。
+ */
+function pickComparable(raw: unknown, subId: string | undefined): unknown {
+  if (subId !== undefined) {
+    return raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)[subId]
+      : undefined;
+  }
+  if (
+    raw !== null &&
+    typeof raw === 'object' &&
+    !Array.isArray(raw) &&
+    'value' in (raw as Record<string, unknown>)
+  ) {
+    return (raw as Record<string, unknown>).value;
+  }
+  return raw;
+}
+
 /** 判断单个条件是否成立。空值/未作答语义集中在此,是前后端最易漂移处。 */
 export function evalCondition(cond: Condition, answers: Answers): boolean {
-  // 有 subId 时钻入矩阵子行:答案形如 { 子行id: 选项value };该题未答或非对象则子行取 undefined。
   const raw = answers[cond.qid];
-  const a =
-    cond.subId !== undefined
-      ? raw && typeof raw === 'object' && !Array.isArray(raw)
-        ? (raw as Record<string, unknown>)[cond.subId]
-        : undefined
-      : raw;
+  const a = pickComparable(raw, cond.subId);
   const answered = a !== undefined && a !== null && a !== '';
   switch (cond.op) {
     case 'answered':

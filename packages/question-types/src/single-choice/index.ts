@@ -10,4 +10,9 @@ export function registerSingleChoice(): void {
 }
 
 export { singleChoiceHandler } from './handler.js';
-export type { SingleChoiceProps } from './handler.js';
+export type {
+  SingleChoiceProps,
+  SingleChoiceOption,
+  SingleChoiceArrange,
+  SingleChoiceFillAnswer,
+} from './handler.js';
