@@ -50,10 +50,16 @@ export async function saveSurvey(schema: SurveySchema): Promise<void> {
   await apiSend<{ ok: boolean }>(`/surveys/${schema.id}`, 'PUT', schema);
 }
 
-/** 发布问卷(草稿 → 版本快照 → live),返回新版本号。 */
-export async function publishSurvey(id: string): Promise<number> {
-  const { version } = await apiSend<{ ok: boolean; version: number }>(`/surveys/${id}/publish`, 'POST');
-  return version;
+/**
+ * 发布问卷(草稿 → 版本快照 → live)。返回 { version, unchanged }。
+ * unchanged=true:草稿与当前对外版本内容一致,后端未造新版本(重发免空版)。
+ */
+export async function publishSurvey(id: string): Promise<{ version: number; unchanged: boolean }> {
+  const { version, unchanged } = await apiSend<{ ok: boolean; version: number; unchanged: boolean }>(
+    `/surveys/${id}/publish`,
+    'POST',
+  );
+  return { version, unchanged };
 }
 
 /** 结束回收(live → closed)。仅进行中可结束,否则后端 409。 */

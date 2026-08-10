@@ -57,9 +57,17 @@ type LoadState =
   | { status: 'error'; message: string; notFound: boolean };
 
 export function App() {
-  const id = surveyIdFromHash();
+  // id 存进 state 并监听 hashchange:改 URL 的 #/s/:id 片段是「同文档导航」,浏览器不刷新页面、
+  // 只触发 hashchange。不订阅它则 React 不重渲染、加载 effect(keyed on id)不重跑,得手动 Ctrl+R。
+  const [id, setId] = useState(surveyIdFromHash);
   const [load, setLoad] = useState<LoadState>({ status: 'loading' });
   const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    const onHashChange = () => setId(surveyIdFromHash());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -117,12 +125,15 @@ export function App() {
       </main>
     );
   }
-  return <Survey schema={load.schema} demo={load.demo} />;
+  // key 绑 id:v{version}:软导航(改 hash 换问卷)或换版时强制重挂 Survey,
+  // 让 useFill 按新 (id,version) 重跑惰性初始化,不把上一份问卷的作答态带过来。
+  return <Survey key={`${load.schema.id}:v${load.schema.version}`} schema={load.schema} demo={load.demo} />;
 }
 
 /** 承载单份问卷的作答态(useFill 依赖稳定的 surveyId,故拆成子组件按 schema.id 挂载)。 */
 function Survey({ schema, demo }: { schema: SurveySchema; demo: boolean }) {
-  const [state, dispatch] = useFill(schema.id);
+  // useFill 依赖稳定的 (surveyId, version):版本锚定,换版后 key 变、答案集隔离。
+  const [state, dispatch] = useFill(schema.id, schema.version);
 
   return (
     <div style={{ background: 'var(--page)', minHeight: '100vh' }}>

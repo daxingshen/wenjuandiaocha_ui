@@ -57,13 +57,15 @@ export async function fetchSurvey(id: string): Promise<SurveySchema> {
  * 后端提交时必须完整重跑校验+normalize,永不信任客户端(决策 6 安全底线)。
  * 成功返回后端权威的规范化行数;失败抛 ApiError(400 带 validation,429 限频,5xx 服务端)。
  */
-export async function submitAnswers(surveyId: string, answers: Answers): Promise<{ rows: number }> {
+export async function submitAnswers(surveyId: string, version: number, answers: Answers): Promise<{ rows: number }> {
   let res: Response;
   try {
     res = await fetch(`${BASE}/public/surveys/${surveyId}/answers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers }),
+      // 带 version(版本锚定):后端按作答者实际看到的这一版取快照校验落库,
+      // 消除「作答中所有者重发新版 → 拿没见过的题报必答」死局(见 api-contract §3)。
+      body: JSON.stringify({ answers, version }),
     });
   } catch {
     throw new ApiError(0, '网络异常,提交未成功');

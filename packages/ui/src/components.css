@@ -427,10 +427,42 @@ table.cross tr.total th, table.cross tr.total td, table.cross td.total { backgro
 .fill-foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 34px; }
 .fill-foot .note { font-size: 12px; color: var(--ink-muted); flex: 1; min-width: 180px; }
 
+/* 窄屏作答路径:浮动按钮 + 抽屉。桌面(>960px)不显示,双栏侧栏已常驻。 */
+.fill-rail-fab { display: none; }
+.fill-rail-drawer-mask { display: none; }
+
 @media (max-width: 960px) {
   .fill-wrap { grid-template-columns: 1fr; }
   .fill-rail { display: none; }
   .fill-thin { display: block; }
   .fill-col { padding: 28px 20px 88px; }
   .fill-head h1 { font-size: 22px; }
+
+  /* 浮动唤起按钮:右下角,显进度 %,点开作答路径抽屉 */
+  .fill-rail-fab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    position: fixed; right: 16px; bottom: 16px; z-index: 30;
+    width: 60px; height: 60px; border-radius: 50%; border: none;
+    background: var(--s7); color: #fff; cursor: pointer;
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--s7) 40%, transparent);
+  }
+  .fill-rail-fab .fab-pct { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .fill-rail-fab .fab-lbl { font-size: 9px; font-weight: 600; letter-spacing: .02em; opacity: .9; }
+
+  /* 抽屉:遮罩 + 右侧滑入面板,复用 .fill-rail 内容样式 */
+  .fill-rail-drawer-mask {
+    display: block; position: fixed; inset: 0; z-index: 40;
+    background: color-mix(in srgb, var(--ink) 42%, transparent);
+  }
+  .fill-rail-drawer {
+    position: fixed; top: 0; right: 0; height: 100%; width: min(86vw, 340px);
+    background: var(--surface); border-left: 1px solid var(--line);
+    padding: 26px 20px 26px 24px; overflow-y: auto;
+    box-shadow: -8px 0 28px color-mix(in srgb, var(--ink) 20%, transparent);
+  }
+  .fill-rail-drawer .drawer-close {
+    position: absolute; top: 14px; right: 14px; width: 30px; height: 30px;
+    border: none; background: var(--surface-2); border-radius: 8px; cursor: pointer;
+    color: var(--ink-2); font-size: 14px;
+  }
 }
