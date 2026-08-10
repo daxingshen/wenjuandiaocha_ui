@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../auth/useAuthStore.js';
 import { TopBar } from '../../components/TopBar.js';
 import { listSurveys, closeSurvey, reopenSurvey, type SurveyListItem } from '../../api/surveys.js';
+import { ConfirmDialog } from '../../components/ConfirmDialog.js';
 
 /** 类型 → 色板槽位 + 图标(对照原型 typeMeta / 类型色映射 UI 文档 §2.1)。 */
 const TYPE_META: Record<string, { color: string; ic: string; label: string }> = {
@@ -57,6 +58,8 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState('');
+  // 待确认动作:结束回收 / 重新打开都有副作用,点击先记下目标,弹确认框,确认才执行。
+  const [pending, setPending] = useState<{ kind: 'close' | 'reopen'; id: string } | null>(null);
 
   const refresh = () => {
     return listSurveys()
@@ -78,25 +81,17 @@ export function Dashboard() {
   // 新建:不再先落库,进内存草稿态编辑器(/survey/new),用户点保存才首存落库(零写入直到保存)。
   const onCreate = () => navigate('/survey/new/edit');
 
-  // 结束回收 / 重新打开:调后端状态机,成功后重拉列表刷新徽章。
-  const onClose = async (id: string) => {
+  // 结束回收 / 重新打开:经二次确认后调后端状态机,成功后重拉列表刷新徽章、关确认框。
+  const runPending = async () => {
+    if (!pending) return;
+    const { kind, id } = pending;
     setBusyId(id);
     try {
-      await closeSurvey(id);
+      await (kind === 'close' ? closeSurvey(id) : reopenSurvey(id));
       await refresh();
+      setPending(null);
     } catch {
-      setError('结束失败');
-    } finally {
-      setBusyId('');
-    }
-  };
-  const onReopen = async (id: string) => {
-    setBusyId(id);
-    try {
-      await reopenSurvey(id);
-      await refresh();
-    } catch {
-      setError('重新打开失败');
+      setError(kind === 'close' ? '结束失败' : '重新打开失败');
     } finally {
       setBusyId('');
     }
@@ -216,7 +211,7 @@ export function Dashboard() {
                       <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/publish`)}>📤 发送分享</button>
                       <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/analyze`)}>📊 分析下载</button>
                       {s.status === 'live' && (
-                        <button className="btn sm" disabled={busyId === s.id} onClick={() => onClose(s.id)}>
+                        <button className="btn sm" disabled={busyId === s.id} onClick={() => setPending({ kind: 'close', id: s.id })}>
                           {busyId === s.id ? '处理中…' : '⏹ 结束回收'}
                         </button>
                       )}
@@ -225,7 +220,7 @@ export function Dashboard() {
                           className="btn sm"
                           disabled={busyId === s.id}
                           title="将恢复上次发布的版本供作答"
-                          onClick={() => onReopen(s.id)}
+                          onClick={() => setPending({ kind: 'reopen', id: s.id })}
                         >
                           {busyId === s.id ? '处理中…' : '↻ 重新打开'}
                         </button>
@@ -240,6 +235,20 @@ export function Dashboard() {
           </div>
         </main>
       </div>
+
+      <ConfirmDialog
+        open={pending !== null}
+        title={pending?.kind === 'reopen' ? '重新打开' : '结束回收'}
+        body={
+          pending?.kind === 'reopen'
+            ? '将恢复上次发布的版本重新对外接收作答。确认重新打开?'
+            : '结束后问卷将停止接收新的作答,已回收数据保留。确认结束?'
+        }
+        confirmLabel={pending?.kind === 'reopen' ? '重新打开' : '结束回收'}
+        busy={busyId !== ''}
+        onConfirm={runPending}
+        onCancel={() => busyId === '' && setPending(null)}
+      />
     </div>
   );
 }

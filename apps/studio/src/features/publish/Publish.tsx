@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { publishSurvey, closeSurvey, getSurveyStats, type SurveyStats } from '../../api/surveys.js';
+import { ConfirmDialog } from '../../components/ConfirmDialog.js';
 import { answerLink, resolveRuntimeBase } from './publishLink.js';
 
 const STATUS_LABEL: Record<string, { cls: string; label: string }> = {
@@ -43,6 +44,7 @@ export function Publish({ id, onGoEdit }: PublishProps) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [copied, setCopied] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
 
   const link = answerLink(id, resolveRuntimeBase());
 
@@ -89,12 +91,14 @@ export function Publish({ id, onGoEdit }: PublishProps) {
     }
   };
 
+  // 结束回收有副作用(问卷停止接收作答),点击先弹二次确认,确认后才真正调用。
   const doClose = async () => {
     setBusy(true);
     setNotice('');
     try {
       await closeSurvey(id);
       await refresh();
+      setConfirmClose(false);
     } catch {
       setNotice('结束失败');
     } finally {
@@ -216,17 +220,12 @@ export function Publish({ id, onGoEdit }: PublishProps) {
               </button>
             )}
             {status === 'live' && (
-              <button className="btn" disabled={busy} onClick={doClose}>
+              <button className="btn" disabled={busy} onClick={() => setConfirmClose(true)}>
                 {busy ? '处理中…' : '⏹ 结束回收'}
               </button>
             )}
             {status === 'closed' && (
               <p style={{ fontSize: 12, color: 'var(--ink-muted)', margin: 0 }}>问卷已结束回收。如需重新开放,请在看板操作。</p>
-            )}
-            {status === 'live' && (
-              <button className="btn primary" disabled={busy} title="将当前已保存的草稿冻结为新版本对外发布(如需改内容请先在编辑页保存)" onClick={doPublish}>
-                {busy ? '发布中…' : '再次发布(更新对外版本)'}
-              </button>
             )}
           </div>
 
@@ -234,6 +233,16 @@ export function Publish({ id, onGoEdit }: PublishProps) {
           {notice && <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 10 }}>{notice}</p>}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmClose}
+        title="结束回收"
+        body="结束后问卷将停止接收新的作答,已回收数据保留。如需重新开放,可在看板操作。确认结束?"
+        confirmLabel="结束回收"
+        busy={busy}
+        onConfirm={doClose}
+        onCancel={() => !busy && setConfirmClose(false)}
+      />
     </div>
   );
 }
