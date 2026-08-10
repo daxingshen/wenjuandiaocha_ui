@@ -121,13 +121,8 @@ export function SurveyRoute() {
           </>
         );
       case 'publish':
-        // 发布/结束/重开/复制链接等场景动作在页面内(Publish),顶栏只留导航,避免双入口。
-        return (
-          <>
-            <button className="btn sm" onClick={() => navigate(`/survey/${id}/edit`)}>✎ 编辑</button>
-            <button className="btn sm" onClick={() => navigate('/home')}>返回</button>
-          </>
-        );
+        // 发布/结束/复制链接等场景动作在页面内(Publish),顶栏只留返回导航,避免双入口。
+        return <button className="btn sm" onClick={() => navigate('/home')}>返回</button>;
       case 'analyze':
         return <button className="btn sm" onClick={() => navigate('/home')}>返回</button>;
       case 'edit':
