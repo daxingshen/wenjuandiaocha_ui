@@ -5,13 +5,13 @@
  * 其余渠道(微信/邀请/嵌入/样本)与回收控制开关按禁用占位呈现,不承诺后端(api-contract §7 延后)。
  *
  * 状态自管:挂载拉 getSurveyStats(id) 得 {status, publishedVersion, responseCount};
- * 按 status 分支(draft/live/closed/new)。发布/结束/重开只调对应 api,发布的是库里**已保存**的草稿——
+ * 按 status 分支(draft/live/closed/new)。发布/结束只调对应 api,发布的是库里**已保存**的草稿——
  * 发布页只做发布行为,不修改问卷内容(不保存、不写草稿)。成功后重拉 stats。
- * id==='new'(内存草稿未落库)无可发布内容,引导去编辑页保存,不在此保存。
+ * 重新打开不在发布页(入口在看板 Dashboard);id==='new'(内存草稿未落库)引导去编辑页保存,不在此保存。
  */
 import { useCallback, useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { publishSurvey, closeSurvey, reopenSurvey, getSurveyStats, type SurveyStats } from '../../api/surveys.js';
+import { publishSurvey, closeSurvey, getSurveyStats, type SurveyStats } from '../../api/surveys.js';
 import { answerLink, resolveRuntimeBase } from './publishLink.js';
 
 const STATUS_LABEL: Record<string, { cls: string; label: string }> = {
@@ -97,19 +97,6 @@ export function Publish({ id, onGoEdit }: PublishProps) {
       await refresh();
     } catch {
       setNotice('结束失败');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const doReopen = async () => {
-    setBusy(true);
-    setNotice('');
-    try {
-      await reopenSurvey(id);
-      await refresh();
-    } catch {
-      setNotice('重新打开失败');
     } finally {
       setBusy(false);
     }
@@ -234,9 +221,7 @@ export function Publish({ id, onGoEdit }: PublishProps) {
               </button>
             )}
             {status === 'closed' && (
-              <button className="btn" disabled={busy} title="将恢复上次发布的版本供作答" onClick={doReopen}>
-                {busy ? '处理中…' : '↻ 重新打开'}
-              </button>
+              <p style={{ fontSize: 12, color: 'var(--ink-muted)', margin: 0 }}>问卷已结束回收。如需重新开放,请在看板操作。</p>
             )}
             {status === 'live' && (
               <button className="btn primary" disabled={busy} title="将当前已保存的草稿冻结为新版本对外发布(如需改内容请先在编辑页保存)" onClick={doPublish}>
