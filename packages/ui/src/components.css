@@ -363,3 +363,74 @@ table.cross tr.total th, table.cross tr.total td, table.cross td.total { backgro
 .modal-title { font-size: 16px; font-weight: 700; }
 .modal-body { color: var(--ink-2); font-size: 13px; margin-top: 8px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+/* ============ 受访者作答页(仅 web 端 · 真实 #/s/:id 桌面形态) ============ */
+/* 与预览测试台复用同一批 .a-* 作答组件;差别在“壳”:这是受访者真实进入的桌面页,
+   不套设备框、不叠营销 hero,签名换成受访者能读懂的「作答路径」栏。移植自 prototype.html §E。 */
+.fill-top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 22px; background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.fill-top .logo { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 700; color: var(--ink); }
+.fill-top .logo .dot { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; background: var(--brand); color: #fff; font-size: 11px; }
+.fill-top .sp { flex: 1; }
+.fill-top .safe { font-size: 11.5px; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; }
+/* 窄屏顶部细进度(宽屏由左栏承担,隐藏) */
+.fill-thin { height: 3px; background: var(--line-soft); position: sticky; top: 52px; z-index: 19; display: none; }
+.fill-thin i { display: block; height: 100%; width: 0; background: var(--brand); transition: width .3s; }
+
+.fill-wrap { display: grid; grid-template-columns: 264px 1fr; align-items: start; }
+
+/* 签名:作答路径栏 —— 沿用预览逻辑检查器的 --s7 语言,面向受访者重写文案 */
+.fill-rail { position: sticky; top: 52px; height: calc(100vh - 52px); overflow-y: auto; padding: 26px 20px 26px 24px; border-right: 1px solid var(--line); }
+.fill-rail .eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--s7); margin-bottom: 14px; }
+.fill-rail .meter { display: flex; align-items: baseline; gap: 6px; }
+.fill-rail .meter .big { font-size: 40px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1; }
+.fill-rail .meter .u { font-size: 15px; font-weight: 700; color: var(--ink-muted); }
+.fill-rail .msub { font-size: 12px; color: var(--ink-muted); font-variant-numeric: tabular-nums; margin: 6px 0 14px; }
+.fill-rail .bar { height: 6px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line-soft); overflow: hidden; margin-bottom: 22px; }
+.fill-rail .bar i { display: block; height: 100%; width: 0; background: var(--s7); border-radius: 999px; transition: width .3s; }
+.fill-path { list-style: none; position: relative; }
+.fill-path::before { content: ""; position: absolute; left: 6px; top: 8px; bottom: 8px; width: 1.5px; background: var(--line); }
+.fnode { position: relative; padding: 7px 0 7px 26px; font-size: 12.5px; color: var(--ink-2); background: none; border: none; text-align: left; width: 100%; display: block; border-radius: 6px; cursor: pointer; }
+.fnode:hover { color: var(--ink); }
+.fnode .dot { position: absolute; left: 0; top: 9px; width: 13px; height: 13px; border-radius: 50%; background: var(--surface); border: 1.5px solid var(--ink-muted); z-index: 1; }
+.fnode .qn { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-muted); margin-right: 6px; }
+.fnode.done .dot { background: var(--s7); border-color: var(--s7); }
+.fnode.done .dot::after { content: "✓"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 9px; color: #fff; font-weight: 700; }
+.fnode.done .qn { color: var(--s7); }
+.fnode.cur { color: var(--ink); font-weight: 600; }
+.fnode.cur .dot { border-color: var(--s7); box-shadow: 0 0 0 3px color-mix(in srgb, var(--s7) 22%, transparent); }
+.fnode.cur .dot::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--s7); }
+.fnode.miss .dot { border-color: var(--critical); border-style: dashed; }
+.fnode.miss .qn { color: var(--critical); }
+.fnode.skip { opacity: .5; }
+.fnode.skip .dot { border-style: dashed; border-color: var(--line); }
+.fnode.skip .lbl { text-decoration: line-through; text-decoration-color: var(--line); }
+.fnode .why { display: block; font-size: 11px; color: var(--s7); font-weight: 500; margin-top: 2px; }
+.fnode.skip .why { color: var(--ink-muted); }
+.fnode[disabled] { cursor: default; }
+
+/* 作答列:阅读宽,不套设备框 */
+.fill-col { max-width: 640px; margin: 0 auto; width: 100%; padding: 40px 28px 96px; }
+.fill-head { padding-bottom: 22px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
+.fill-head h1 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; }
+.fill-head .desc { margin-top: 10px; color: var(--ink-2); font-size: 14px; max-width: 52ch; }
+.fill-head .meta { margin-top: 14px; display: flex; gap: 16px; font-size: 11.5px; color: var(--ink-muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.fill-head .meta b { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+/* 题块:比预览的手机卡更舒展,题号是排版主角 */
+.fill-col .a-body { padding: 0; }
+.fill-col .a-q { background: none; border: none; border-bottom: 1px solid var(--line-soft); border-radius: 0; padding: 26px 0; margin: 0; scroll-margin-top: 70px; }
+.fill-col .a-q:last-of-type { border-bottom: none; }
+.fill-col .a-q .qt { font-size: 17px; margin-bottom: 16px; }
+.fill-col .a-q.invalid { position: relative; }
+.fill-col .a-q.invalid .no { color: var(--critical); }
+.fill-col .a-submit { margin: 34px 0 0; }
+.fill-col .a-submit .btn { width: auto; padding: 14px 30px; }
+.fill-foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 34px; }
+.fill-foot .note { font-size: 12px; color: var(--ink-muted); flex: 1; min-width: 180px; }
+
+@media (max-width: 960px) {
+  .fill-wrap { grid-template-columns: 1fr; }
+  .fill-rail { display: none; }
+  .fill-thin { display: block; }
+  .fill-col { padding: 28px 20px 88px; }
+  .fill-head h1 { font-size: 22px; }
+}
