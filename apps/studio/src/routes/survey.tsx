@@ -7,9 +7,10 @@
  * 发布→占位。schema 现来自编辑器种子;:id 驱动加载与保存待后端 CRUD。
  */
 import { useEffect, useState } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { RequireAuth } from '../features/auth/RequireAuth.js';
 import { TopBar } from '../components/TopBar.js';
+import { NotFound } from '../components/NotFound.js';
 import { SaveDialog } from '../components/SaveDialog.js';
 import { Editor } from '../features/editor/Editor.js';
 import { Analysis } from '../features/analysis/Analysis.js';
@@ -67,8 +68,15 @@ export function SurveyRoute() {
     };
   }, [id, load]);
 
+  // 未知 tab(如 /survey/:id/publsh 拼错):不静默回退,统一走默认 404 页,让错误可见。
   const isTab = (t: string | undefined): t is TabKey => TABS.some((x) => x.key === t);
-  if (!isTab(tab)) return <Navigate to={`/survey/${id}/edit`} replace />;
+  if (!isTab(tab)) {
+    return (
+      <RequireAuth>
+        <NotFound detail={`没有「${tab}」这个标签页。可用:编辑 / 预览 / 发布回收 / 数据分析。`} />
+      </RequireAuth>
+    );
+  }
 
   // 首存:内存草稿(id==='new')POST 落库拿真实 id,写回 store 并把 URL 换成真实 id(replace,不留 new 历史)。
   // 返回落库后的真实 id 供发布等后续动作复用;非新建走 PUT。

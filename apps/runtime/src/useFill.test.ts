@@ -4,18 +4,23 @@
  * showErrors 退出提交中;done/reset 才清盘。回归防护:setAnswer 清掉上次提交错误。
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { makeReducer, type FillState } from './useFill.js';
+import { makeReducer, sweepStaleVersions, type FillState } from './useFill.js';
 
-const reducer = makeReducer('sid-test');
-const KEY = 'xingjuan:answers:sid-test';
+const reducer = makeReducer('sid-test', 1);
+const KEY = 'xingjuan:answers:sid-test:v1';
 
 // 工作区默认 node 环境(无 jsdom);用最小内存 localStorage 桩,以便断言断点续答的落盘/清盘。
+// 含 length / key(i):sweepStaleVersions 靠它们枚举 key(桩需贴近真实 Storage 接口)。
 const mem = new Map<string, string>();
 vi.stubGlobal('localStorage', {
   getItem: (k: string) => (mem.has(k) ? mem.get(k)! : null),
   setItem: (k: string, v: string) => void mem.set(k, v),
   removeItem: (k: string) => void mem.delete(k),
   clear: () => mem.clear(),
+  get length() {
+    return mem.size;
+  },
+  key: (i: number) => [...mem.keys()][i] ?? null,
 });
 
 const base = (over: Partial<FillState> = {}): FillState => ({
@@ -97,5 +102,31 @@ describe('提交态机', () => {
     const s = reducer(base({ phase: 'done', submittedRows: 2 }), { type: 'reset' });
     expect(s).toEqual(base());
     expect(localStorage.getItem(KEY)).toBeNull();
+  });
+});
+
+describe('版本隔离(版本锚定)', () => {
+  it('不同版本落盘 key 不同 —— 换版后旧答案不跨版套用', () => {
+    const v1 = makeReducer('sid-x', 1);
+    const v2 = makeReducer('sid-x', 2);
+    v1(base(), { type: 'setAnswer', qid: 'q1', value: 'a' });
+    expect(localStorage.getItem('xingjuan:answers:sid-x:v1')).toBe(JSON.stringify({ q1: 'a' }));
+    // v2 的落盘写到独立 key,不污染 v1
+    v2(base(), { type: 'setAnswer', qid: 'q1', value: 'b' });
+    expect(localStorage.getItem('xingjuan:answers:sid-x:v2')).toBe(JSON.stringify({ q1: 'b' }));
+    expect(localStorage.getItem('xingjuan:answers:sid-x:v1')).toBe(JSON.stringify({ q1: 'a' }));
+  });
+});
+
+describe('孤儿缓存清理(sweepStaleVersions)', () => {
+  it('载入新版时清掉同卷旧版 key,保留当前版与他卷', () => {
+    localStorage.setItem('xingjuan:answers:sid-x:v1', JSON.stringify({ q1: 'old' }));
+    localStorage.setItem('xingjuan:answers:sid-x:v2', JSON.stringify({ q1: 'cur' }));
+    localStorage.setItem('xingjuan:answers:sid-y:v1', JSON.stringify({ q1: 'other' })); // 他卷,不该动
+    // 载入 sid-x 的 v2:清掉同卷旧版 v1,保留 v2 与他卷
+    sweepStaleVersions('sid-x', 2);
+    expect(localStorage.getItem('xingjuan:answers:sid-x:v1')).toBeNull(); // 旧版孤儿清掉
+    expect(localStorage.getItem('xingjuan:answers:sid-x:v2')).toBe(JSON.stringify({ q1: 'cur' })); // 当前版保留
+    expect(localStorage.getItem('xingjuan:answers:sid-y:v1')).toBe(JSON.stringify({ q1: 'other' })); // 他卷保留
   });
 });

@@ -10,7 +10,7 @@
  * 冒险点(原型 §4.5):被逻辑隐藏的题不从路径里消失,而是连同「因 Qx 跳过」原因留在时间线里,
  * 消除「题目忽隐忽现」的迷失感。完成度只算可见题。
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { evaluate, validateSurvey, type SurveySchema } from '@xingjuan/engine';
 import { getAnswer } from '@xingjuan/question-types';
 import { ApiError, submitAnswers } from '../api/client.js';
@@ -42,9 +42,51 @@ export function Fill({
   // 路径栏时间线(纯派生,已抽到 fillPath.ts 便于单测):含隐藏题,skip 带源题序号。
   const nodes = useMemo(() => buildPath(schema, answers, hidden, tried), [schema, answers, hidden, tried]);
 
+  // 窄屏(≤960px)作答路径抽屉开合。桌面双栏常驻侧栏,不用此态。
+  const [railOpen, setRailOpen] = useState(false);
+
   const jump = (qid: string) => {
     document.getElementById(`q-${qid}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
+
+  // 作答路径内容(进度 + 时间线节点)。桌面侧栏与窄屏抽屉共用,onJump 里桌面只跳、抽屉跳完顺手关。
+  const railBody = (onJump: (qid: string) => void) => (
+    <>
+      <div className="eyebrow">你的作答路径</div>
+      <div className="meter"><span className="big">{pct}</span><span className="u">%</span></div>
+      <div className="msub">
+        已答 {answeredCount} / {visible.length} 可见题
+        {skipCount > 0 && ` · ${skipCount} 题按你的选择跳过`}
+      </div>
+      <div className="bar"><i style={{ width: `${pct}%` }} /></div>
+      <ul className="fill-path">
+        {nodes.map(({ qid, no, title, status, srcNo }) => {
+          const short = title.length > 15 ? `${title.slice(0, 14)}…` : title;
+          const why =
+            status === 'skip' && srcNo
+              ? `因 Q${srcNo} 的选择跳过`
+              : status === 'miss'
+                ? '必答 · 待完成'
+                : '';
+          return (
+            <li key={qid}>
+              <button
+                type="button"
+                className={status ? `fnode ${status}` : 'fnode'}
+                onClick={() => status !== 'skip' && onJump(qid)}
+                disabled={status === 'skip'}
+              >
+                <span className="dot" />
+                <span className="qn">Q{no}</span>
+                <span className="lbl">{short}</span>
+                {why && <span className="why">{why}</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
 
   const onSubmit = async () => {
     if (submitting) return; // 防重复提交
@@ -58,7 +100,7 @@ export function Fill({
     // 提交是权威落库的唯一凭据:必须等后端 200 才算成功,失败留在本页可重试(答案不清盘)
     dispatch({ type: 'submitStart' });
     try {
-      const { rows } = await submitAnswers(schema.id, answers);
+      const { rows } = await submitAnswers(schema.id, schema.version, answers);
       dispatch({ type: 'done', rows });
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError(0, '提交未成功,请稍后重试');
@@ -84,42 +126,8 @@ export function Fill({
       <div className="fill-thin"><i style={{ width: `${pct}%` }} /></div>
 
       <div className="fill-wrap">
-        {/* 签名:作答路径栏 */}
-        <aside className="fill-rail" aria-label="作答路径">
-          <div className="eyebrow">你的作答路径</div>
-          <div className="meter"><span className="big">{pct}</span><span className="u">%</span></div>
-          <div className="msub">
-            已答 {answeredCount} / {visible.length} 可见题
-            {skipCount > 0 && ` · ${skipCount} 题按你的选择跳过`}
-          </div>
-          <div className="bar"><i style={{ width: `${pct}%` }} /></div>
-          <ul className="fill-path">
-            {nodes.map(({ qid, no, title, status, srcNo }) => {
-              const short = title.length > 15 ? `${title.slice(0, 14)}…` : title;
-              const why =
-                status === 'skip' && srcNo
-                  ? `因 Q${srcNo} 的选择跳过`
-                  : status === 'miss'
-                    ? '必答 · 待完成'
-                    : '';
-              return (
-                <li key={qid}>
-                  <button
-                    type="button"
-                    className={status ? `fnode ${status}` : 'fnode'}
-                    onClick={() => status !== 'skip' && jump(qid)}
-                    disabled={status === 'skip'}
-                  >
-                    <span className="dot" />
-                    <span className="qn">Q{no}</span>
-                    <span className="lbl">{short}</span>
-                    {why && <span className="why">{why}</span>}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </aside>
+        {/* 签名:作答路径栏(桌面双栏左列)。窄屏改由抽屉呈现,内容同源 railBody。 */}
+        <aside className="fill-rail" aria-label="作答路径">{railBody(jump)}</aside>
 
         {/* 作答列:复用 .a-* 作答组件 */}
         <main className="fill-col">
@@ -175,6 +183,34 @@ export function Fill({
           </div>
         </main>
       </div>
+
+      {/* 窄屏(≤960px)作答路径:浮动按钮唤起抽屉。桌面用 CSS 隐藏(见 components.css)。 */}
+      <button
+        type="button"
+        className="fill-rail-fab"
+        aria-label="查看作答路径"
+        aria-expanded={railOpen}
+        onClick={() => setRailOpen(true)}
+      >
+        <span className="fab-pct">{pct}%</span>
+        <span className="fab-lbl">作答路径</span>
+      </button>
+      {railOpen && (
+        <div className="fill-rail-drawer-mask" onClick={() => setRailOpen(false)}>
+          <aside
+            className="fill-rail-drawer"
+            aria-label="作答路径"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button type="button" className="drawer-close" aria-label="关闭" onClick={() => setRailOpen(false)}>✕</button>
+            {railBody((qid) => {
+              // 抽屉里跳题后顺手关闭,让用户立刻看到目标题。
+              jump(qid);
+              setRailOpen(false);
+            })}
+          </aside>
+        </div>
+      )}
     </>
   );
 }

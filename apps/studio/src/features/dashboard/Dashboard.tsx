@@ -6,8 +6,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../auth/useAuthStore.js';
 import { TopBar } from '../../components/TopBar.js';
-import { listSurveys, closeSurvey, reopenSurvey, type SurveyListItem } from '../../api/surveys.js';
-import { ConfirmDialog } from '../../components/ConfirmDialog.js';
+import { listSurveys, type SurveyListItem } from '../../api/surveys.js';
 
 /** 类型 → 色板槽位 + 图标(对照原型 typeMeta / 类型色映射 UI 文档 §2.1)。 */
 const TYPE_META: Record<string, { color: string; ic: string; label: string }> = {
@@ -21,7 +20,7 @@ const TYPE_META: Record<string, { color: string; ic: string; label: string }> = 
 
 const STATUS_META: Record<string, { cls: string; label: string }> = {
   live: { cls: 'live', label: '进行中' },
-  draft: { cls: 'draft', label: '草稿' },
+  draft: { cls: 'draft', label: '待发布' },
   closed: { cls: 'closed', label: '已截止' },
 };
 
@@ -46,7 +45,7 @@ const FILTERS = [
   { key: 'vote', label: '投票' },
   { key: 'form', label: '报名' },
   { key: 'live', label: '进行中' },
-  { key: 'draft', label: '草稿' },
+  { key: 'draft', label: '待发布' },
   { key: 'closed', label: '已结束' },
 ];
 
@@ -57,15 +56,6 @@ export function Dashboard() {
   const [surveys, setSurveys] = useState<SurveyListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [busyId, setBusyId] = useState('');
-  // 待确认动作:结束回收 / 重新打开都有副作用,点击先记下目标,弹确认框,确认才执行。
-  const [pending, setPending] = useState<{ kind: 'close' | 'reopen'; id: string } | null>(null);
-
-  const refresh = () => {
-    return listSurveys()
-      .then((rows) => (setSurveys(rows), setError('')))
-      .catch(() => setError('加载问卷失败'));
-  };
 
   useEffect(() => {
     let alive = true;
@@ -80,22 +70,6 @@ export function Dashboard() {
 
   // 新建:不再先落库,进内存草稿态编辑器(/survey/new),用户点保存才首存落库(零写入直到保存)。
   const onCreate = () => navigate('/survey/new/edit');
-
-  // 结束回收 / 重新打开:经二次确认后调后端状态机,成功后重拉列表刷新徽章、关确认框。
-  const runPending = async () => {
-    if (!pending) return;
-    const { kind, id } = pending;
-    setBusyId(id);
-    try {
-      await (kind === 'close' ? closeSurvey(id) : reopenSurvey(id));
-      await refresh();
-      setPending(null);
-    } catch {
-      setError(kind === 'close' ? '结束失败' : '重新打开失败');
-    } finally {
-      setBusyId('');
-    }
-  };
 
   const list = surveys.filter((s) => {
     if (filter === 'all') return true;
@@ -208,23 +182,9 @@ export function Dashboard() {
                     </div>
                     <div className="ops">
                       <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/edit`)}>✏️ 编辑设计</button>
+                      {/* 发布/重新发布/结束/重新打开等生命周期动作集中在发布页(发送分享),看板列表只做导航。 */}
                       <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/publish`)}>📤 发送分享</button>
                       <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/analyze`)}>📊 分析下载</button>
-                      {s.status === 'live' && (
-                        <button className="btn sm" disabled={busyId === s.id} onClick={() => setPending({ kind: 'close', id: s.id })}>
-                          {busyId === s.id ? '处理中…' : '⏹ 结束回收'}
-                        </button>
-                      )}
-                      {s.status === 'closed' && (
-                        <button
-                          className="btn sm"
-                          disabled={busyId === s.id}
-                          title="将恢复上次发布的版本供作答"
-                          onClick={() => setPending({ kind: 'reopen', id: s.id })}
-                        >
-                          {busyId === s.id ? '处理中…' : '↻ 重新打开'}
-                        </button>
-                      )}
                       <div className="spring" />
                       <button className="btn sm ghost" title="更多">⋯</button>
                     </div>
@@ -235,20 +195,6 @@ export function Dashboard() {
           </div>
         </main>
       </div>
-
-      <ConfirmDialog
-        open={pending !== null}
-        title={pending?.kind === 'reopen' ? '重新打开' : '结束回收'}
-        body={
-          pending?.kind === 'reopen'
-            ? '将恢复上次发布的版本重新对外接收作答。确认重新打开?'
-            : '结束后问卷将停止接收新的作答,已回收数据保留。确认结束?'
-        }
-        confirmLabel={pending?.kind === 'reopen' ? '重新打开' : '结束回收'}
-        busy={busyId !== ''}
-        onConfirm={runPending}
-        onCancel={() => busyId === '' && setPending(null)}
-      />
     </div>
   );
 }
