@@ -14,6 +14,16 @@ export interface SurveyListItem {
   updatedAt: string;
 }
 
+/** 单卷发布态统计(发布回收页用)。回收量来自 responses 计数。 */
+export interface SurveyStats {
+  /** draft|live|closed */
+  status: string;
+  /** 已发布版本号;从未发布为 null。 */
+  publishedVersion: number | null;
+  /** 已回收答卷数。 */
+  responseCount: number;
+}
+
 import { apiGet, apiSend } from './client.js';
 
 /** 列出当前用户的问卷。 */
@@ -54,4 +64,9 @@ export async function closeSurvey(id: string): Promise<void> {
 /** 重新打开(closed → live),复用上次发布的版本快照。仅已结束且曾发布过可重开,否则后端 409。 */
 export async function reopenSurvey(id: string): Promise<void> {
   await apiSend<{ ok: boolean }>(`/surveys/${id}/reopen`, 'POST');
+}
+
+/** 取单卷发布态统计(status + 已发布版本 + 回收量)。归属校验,非本人后端 404。 */
+export async function getSurveyStats(id: string): Promise<SurveyStats> {
+  return apiGet<SurveyStats>(`/surveys/${id}/stats`);
 }

@@ -14,6 +14,7 @@ import { SaveDialog } from '../components/SaveDialog.js';
 import { Editor } from '../features/editor/Editor.js';
 import { Analysis } from '../features/analysis/Analysis.js';
 import { Preview } from '../features/preview/Preview.js';
+import { Publish } from '../features/publish/Publish.js';
 import { useEditorStore } from '../features/editor/useEditorStore.js';
 import type { SurveySchema } from '@xingjuan/engine';
 import { getSurvey, saveSurvey, createSurvey, publishSurvey } from '../api/surveys.js';
@@ -103,19 +104,12 @@ export function SurveyRoute() {
     }
   };
 
-  const onPublish = async () => {
-    if (!schema) return;
-    setSaving(true);
-    setNotice('');
-    try {
-      const realId = await persist(); // 先存草稿(含首存落库)再发布,确保快照最新
-      const version = await publishSurvey(realId);
-      setNotice(`已发布 v${version}`);
-    } catch {
-      setNotice('发布失败');
-    } finally {
-      setSaving(false);
-    }
+  // 供发布回收页调用:先存草稿(含首存落库拿真实 id)再发布,返回真实 id;错误上抛供组件自行提示。
+  const publishFromPage = async (): Promise<string> => {
+    if (!schema) throw new Error('no schema');
+    const realId = await persist();
+    await publishSurvey(realId);
+    return realId;
   };
 
   // 顶栏操作组按 tab 场景切换:每个 tab 只留与当下动作相符的按钮(对齐原型)。
@@ -135,10 +129,10 @@ export function SurveyRoute() {
           </>
         );
       case 'publish':
+        // 发布/结束/重开/复制链接等场景动作在页面内(Publish),顶栏只留导航,避免双入口。
         return (
           <>
             <button className="btn sm" onClick={() => navigate(`/survey/${id}/edit`)}>✎ 编辑</button>
-            {saveBtn}
             <button className="btn sm" onClick={() => navigate('/home')}>返回</button>
           </>
         );
@@ -187,19 +181,7 @@ export function SurveyRoute() {
               {tab === 'edit' && <Editor />}
               {tab === 'preview' && <Preview />}
               {tab === 'analyze' && <Analysis />}
-              {tab === 'publish' && (
-                <div style={{ padding: 24 }}>
-                  <p style={{ color: 'var(--ink-muted)', marginBottom: 16 }}>
-                    发布后作答端可通过链接访问当前版本快照。渠道 / 二维码 / 回收控制待实现。
-                  </p>
-                  <button className="btn primary" disabled={saving} onClick={onPublish}>
-                    {saving ? '发布中…' : '发布问卷'}
-                  </button>
-                  <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 12 }}>
-                    作答端地址:<code>/#/s/{id}</code>(runtime,端口 5174)
-                  </p>
-                </div>
-              )}
+              {tab === 'publish' && <Publish id={id!} onPublish={publishFromPage} />}
             </>
           )}
         </div>
