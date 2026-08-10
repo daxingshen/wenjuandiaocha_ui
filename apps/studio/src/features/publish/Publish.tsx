@@ -5,12 +5,13 @@
  * 其余渠道(微信/邀请/嵌入/样本)与回收控制开关按禁用占位呈现,不承诺后端(api-contract §7 延后)。
  *
  * 状态自管:挂载拉 getSurveyStats(id) 得 {status, publishedVersion, responseCount};
- * 按 status 分支(draft/live/closed/new)。发布/结束/重开走 props(复用 survey.tsx 的首存+发布编排)
- * 与 api 层,成功后重拉 stats。id==='new'(内存草稿未落库)不拉 stats,提示先保存。
+ * 按 status 分支(draft/live/closed/new)。发布/结束/重开只调对应 api,发布的是库里**已保存**的草稿——
+ * 发布页只做发布行为,不修改问卷内容(不保存、不写草稿)。成功后重拉 stats。
+ * id==='new'(内存草稿未落库)无可发布内容,引导去编辑页保存,不在此保存。
  */
 import { useCallback, useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { closeSurvey, reopenSurvey, getSurveyStats, type SurveyStats } from '../../api/surveys.js';
+import { publishSurvey, closeSurvey, reopenSurvey, getSurveyStats, type SurveyStats } from '../../api/surveys.js';
 import { answerLink, resolveRuntimeBase } from './publishLink.js';
 
 const STATUS_LABEL: Record<string, { cls: string; label: string }> = {
@@ -31,11 +32,11 @@ const SOON_CONTROLS = ['同一微信 / IP 限答 1 次', '密码访问', '答题
 
 interface PublishProps {
   id: string;
-  /** 发布(含首存落库拿真实 id);由 survey.tsx 传入,复用其编排。返回落库后真实 id。 */
-  onPublish: () => Promise<string | void>;
+  /** 去编辑页(new 态无可发布内容时引导用户先保存)。 */
+  onGoEdit: () => void;
 }
 
-export function Publish({ id, onPublish }: PublishProps) {
+export function Publish({ id, onGoEdit }: PublishProps) {
   const isNew = id === 'new';
   const [stats, setStats] = useState<SurveyStats | null>(null);
   const [loadState, setLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -73,11 +74,12 @@ export function Publish({ id, onPublish }: PublishProps) {
     }
   };
 
+  // 发布库里已保存的草稿快照 —— 不保存、不改草稿(发布页只做发布行为)。
   const doPublish = async () => {
     setBusy(true);
     setNotice('');
     try {
-      await onPublish();
+      await publishSurvey(id);
       await refresh();
       setNotice('已发布');
     } catch {
@@ -113,17 +115,14 @@ export function Publish({ id, onPublish }: PublishProps) {
     }
   };
 
-  // 内存草稿(未落库):没有可对外发布的地址,引导先保存再发布。
+  // 内存草稿(未落库):无可发布内容。发布页不保存问卷,引导回编辑页保存后再来发布。
   if (isNew) {
     return (
       <div className="wpad" style={{ padding: 24 }}>
         <div className="card chart-card" style={{ maxWidth: 520 }}>
-          <div className="ct">先保存并发布</div>
-          <div className="cs">当前问卷尚未保存,保存后才能发布并生成作答链接。</div>
-          <button className="btn primary" disabled={busy} onClick={doPublish}>
-            {busy ? '发布中…' : '🚀 保存并发布'}
-          </button>
-          {notice && <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 10 }}>{notice}</p>}
+          <div className="ct">问卷尚未保存</div>
+          <div className="cs">发布页只负责发布已保存的问卷。请先在编辑页保存,再回来发布。</div>
+          <button className="btn primary" onClick={onGoEdit}>✎ 去编辑页保存</button>
         </div>
       </div>
     );
@@ -240,7 +239,7 @@ export function Publish({ id, onPublish }: PublishProps) {
               </button>
             )}
             {status === 'live' && (
-              <button className="btn primary" disabled={busy} onClick={doPublish}>
+              <button className="btn primary" disabled={busy} title="将当前已保存的草稿冻结为新版本对外发布(如需改内容请先在编辑页保存)" onClick={doPublish}>
                 {busy ? '发布中…' : '再次发布(更新对外版本)'}
               </button>
             )}

@@ -17,7 +17,7 @@ import { Preview } from '../features/preview/Preview.js';
 import { Publish } from '../features/publish/Publish.js';
 import { useEditorStore } from '../features/editor/useEditorStore.js';
 import type { SurveySchema } from '@xingjuan/engine';
-import { getSurvey, saveSurvey, createSurvey, publishSurvey } from '../api/surveys.js';
+import { getSurvey, saveSurvey, createSurvey } from '../api/surveys.js';
 
 /** 新建时的空白内存草稿(未落库,首存前只存在于编辑器 store)。 */
 function emptyDraft(): SurveySchema {
@@ -104,14 +104,6 @@ export function SurveyRoute() {
     }
   };
 
-  // 供发布回收页调用:先存草稿(含首存落库拿真实 id)再发布,返回真实 id;错误上抛供组件自行提示。
-  const publishFromPage = async (): Promise<string> => {
-    if (!schema) throw new Error('no schema');
-    const realId = await persist();
-    await publishSurvey(realId);
-    return realId;
-  };
-
   // 顶栏操作组按 tab 场景切换:每个 tab 只留与当下动作相符的按钮(对齐原型)。
   const saveBtn = (
     <button className="btn primary sm" disabled={saving || loadState !== 'ready'} onClick={() => setSaveDialogOpen(true)}>
@@ -181,7 +173,7 @@ export function SurveyRoute() {
               {tab === 'edit' && <Editor />}
               {tab === 'preview' && <Preview />}
               {tab === 'analyze' && <Analysis />}
-              {tab === 'publish' && <Publish id={id!} onPublish={publishFromPage} />}
+              {tab === 'publish' && <Publish id={id!} onGoEdit={() => navigate(`/survey/${id}/edit`)} />}
             </>
           )}
         </div>
