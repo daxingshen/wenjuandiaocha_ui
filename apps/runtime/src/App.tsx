@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from 'react';
 import type { SurveySchema } from '@xingjuan/engine';
-import { fetchSurvey } from './api/client.js';
+import { ApiError, fetchSurvey } from './api/client.js';
 import { Fill } from './pages/Fill.js';
 import { Done } from './pages/Done.js';
 import { useFill } from './useFill.js';
@@ -53,32 +53,69 @@ function surveyIdFromHash(): string {
 type LoadState =
   | { status: 'loading' }
   | { status: 'ready'; schema: SurveySchema; demo: boolean }
-  | { status: 'error'; message: string };
+  // notFound=true(后端 404:不存在/未发布/已结束)不可重试;否则(网络/5xx)可重试
+  | { status: 'error'; message: string; notFound: boolean };
 
 export function App() {
   const id = surveyIdFromHash();
   const [load, setLoad] = useState<LoadState>({ status: 'loading' });
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let alive = true;
-    // 无 id 直接用 demo;有 id 打端点,失败回落 demo 并标注。
+    // 无 id:本地开发直开,用 demo 并标注。真实 :id 链接不再回落 demo(gate① 决议)。
     if (!id) {
       setLoad({ status: 'ready', schema: DEMO, demo: true });
       return;
     }
+    setLoad({ status: 'loading' });
     fetchSurvey(id)
       .then((schema) => alive && setLoad({ status: 'ready', schema, demo: false }))
-      .catch(() => alive && setLoad({ status: 'ready', schema: { ...DEMO, id }, demo: true }));
+      .catch((e: unknown) => {
+        if (!alive) return;
+        const notFound = e instanceof ApiError && e.status === 404;
+        setLoad({
+          status: 'error',
+          notFound,
+          message: notFound
+            ? '问卷不存在、未发布或已结束'
+            : e instanceof ApiError && e.message
+              ? e.message
+              : '加载失败,请稍后重试',
+        });
+      });
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   if (load.status === 'loading') {
     return <main style={{ fontFamily: 'var(--font)', textAlign: 'center', padding: 48, color: 'var(--ink-muted)' }}>加载中…</main>;
   }
   if (load.status === 'error') {
-    return <main style={{ fontFamily: 'var(--font)', textAlign: 'center', padding: 48, color: 'var(--critical)' }}>{load.message}</main>;
+    return (
+      <main style={{ fontFamily: 'var(--font)', textAlign: 'center', padding: 48, color: 'var(--ink)' }}>
+        <div style={{ fontSize: 44, marginBottom: 12 }}>😕</div>
+        <p style={{ color: 'var(--critical)', fontSize: 16 }}>{load.message}</p>
+        {!load.notFound && (
+          <button
+            type="button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            style={{
+              marginTop: 20,
+              padding: '10px 20px',
+              border: '1px solid var(--line)',
+              borderRadius: 8,
+              background: 'var(--surface)',
+              color: 'var(--ink)',
+              cursor: 'pointer',
+            }}
+          >
+            重试
+          </button>
+        )}
+      </main>
+    );
   }
   return <Survey schema={load.schema} demo={load.demo} />;
 }

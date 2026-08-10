@@ -1,14 +1,20 @@
 /**
- * 作答页:公开、匿名、极小。engine 完整链路:
- * 渲染未隐藏题 → 实时逻辑求值隐藏 → 提交时 validate(逐题错误)→ normalize → 提交。
- * 用原型 a-hero / a-prog / a-q / a-submit 结构(ui/components.css)。
+ * 作答页(桌面双栏形态,对应 prototype.html §E / UI-原型设计文档 §4.5):
+ * 左侧签名「作答路径栏」(.fill-rail:完成度大数字 + 进度条 + 时间线题目节点)+
+ * 右侧 640px 阅读列(.fill-col:问卷头 + 舒展题块 + 提交条)。≤960px 折叠为单栏,
+ * 顶部细进度(.fill-thin)接管。复用同一批 .a-* 作答组件与 engine 逻辑求值。
  *
+ * engine 完整链路:渲染未隐藏题 → 实时 evaluate 隐藏 → 提交时 validate(逐题错误)→ normalize → 提交。
  * 前端 validate/normalize 仅为体验(即时反馈);后端提交时必须完整重跑,永不信任客户端(决策 6)。
+ *
+ * 冒险点(原型 §4.5):被逻辑隐藏的题不从路径里消失,而是连同「因 Qx 跳过」原因留在时间线里,
+ * 消除「题目忽隐忽现」的迷失感。完成度只算可见题。
  */
 import { useMemo } from 'react';
-import { evaluate, normalizeSurvey, validateSurvey, type SurveySchema } from '@xingjuan/engine';
+import { evaluate, validateSurvey, type SurveySchema } from '@xingjuan/engine';
 import { getAnswer } from '@xingjuan/question-types';
-import { submitAnswers } from '../api/client.js';
+import { ApiError, submitAnswers } from '../api/client.js';
+import { buildPath, isAnswered } from '../fillPath.js';
 import type { FillAction, FillState } from '../useFill.js';
 
 export function Fill({
@@ -20,64 +26,155 @@ export function Fill({
   state: FillState;
   dispatch: React.Dispatch<FillAction>;
 }) {
-  const { answers, errors } = state;
+  const { answers, errors, submitting, submitError, triedSubmit } = state;
   // 隐藏题是 answers 的纯派生;每次作答后重算(约束 3:逻辑求值器统一执行)
   const { hidden } = useMemo(() => evaluate(schema.rules, answers), [schema.rules, answers]);
   const errorOf = (qid: string) => errors.find((e) => e.qid === qid)?.message;
+  // 已提交尝试(sticky,对应原型 fTried):必答红/路径栏 miss 在补填时持续、实时更新
+  const tried = triedSubmit;
 
   // 进度:已答 / 可见题总数(隐藏题不计)
   const visible = schema.questions.filter((q) => !hidden.has(q.id));
-  const answered = visible.filter((q) => {
-    const a = answers[q.id];
-    return a !== undefined && a !== null && a !== '';
-  }).length;
-  const pct = visible.length === 0 ? 0 : Math.round((answered / visible.length) * 100);
+  const answeredCount = visible.filter((q) => isAnswered(answers[q.id])).length;
+  const skipCount = schema.questions.length - visible.length;
+  const pct = visible.length === 0 ? 0 : Math.round((answeredCount / visible.length) * 100);
 
-  const onSubmit = () => {
+  // 路径栏时间线(纯派生,已抽到 fillPath.ts 便于单测):含隐藏题,skip 带源题序号。
+  const nodes = useMemo(() => buildPath(schema, answers, hidden, tried), [schema, answers, hidden, tried]);
+
+  const jump = (qid: string) => {
+    document.getElementById(`q-${qid}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const onSubmit = async () => {
+    if (submitting) return; // 防重复提交
+    // 本地校验仅为即时反馈;后端会权威重跑(决策 6)
     const errs = validateSurvey(schema, answers);
     if (errs.length > 0) {
       dispatch({ type: 'showErrors', errors: errs });
-      document.getElementById(`q-${errs[0]!.qid}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      jump(errs[0]!.qid);
       return;
     }
-    const rows = normalizeSurvey(schema, answers);
-    void submitAnswers(schema.id, answers).catch(() => {});
-    dispatch({ type: 'done', rows: rows.length });
+    // 提交是权威落库的唯一凭据:必须等后端 200 才算成功,失败留在本页可重试(答案不清盘)
+    dispatch({ type: 'submitStart' });
+    try {
+      const { rows } = await submitAnswers(schema.id, answers);
+      dispatch({ type: 'done', rows });
+    } catch (e) {
+      const err = e instanceof ApiError ? e : new ApiError(0, '提交未成功,请稍后重试');
+      // 后端权威校验(400)带逐题错误:映射回题目错误态,滚到首个
+      if (err.validation && err.validation.length > 0) {
+        dispatch({ type: 'showErrors', errors: err.validation });
+        jump(err.validation[0]!.qid);
+        return;
+      }
+      dispatch({ type: 'submitFail', message: err.message });
+    }
   };
 
+  const missCount = tried ? visible.filter((q) => q.required && !isAnswered(answers[q.id])).length : 0;
+
   return (
-    <main style={{ maxWidth: 480, margin: '0 auto' }}>
-      <div className="a-hero">
-        <h2>{schema.title}</h2>
-        <p>感谢参与 · 匿名填写</p>
-        <div className="a-prog"><i style={{ width: `${pct}%` }} /></div>
-        <p style={{ marginTop: 8 }}>已完成 {answered} / {visible.length} 题</p>
-      </div>
+    <>
+      <header className="fill-top">
+        <div className="logo"><span className="dot">星</span>星卷</div>
+        <div className="sp" />
+        <span className="safe">🔒 匿名 · 断点续答已开</span>
+      </header>
+      <div className="fill-thin"><i style={{ width: `${pct}%` }} /></div>
 
-      <div className="a-body">
-        {visible.map((q, i) => {
-          const Answer = getAnswer(q.type);
-          const err = errorOf(q.id);
-          return (
-            <div key={q.id} id={`q-${q.id}`} className="a-q" style={err ? { borderColor: 'var(--critical)' } : undefined}>
-              <div className="qt">
-                {q.required && <span className="req">* </span>}
-                <span className="no">Q{i + 1}</span> {q.title}
-              </div>
-              {Answer ? (
-                <Answer question={q} value={answers[q.id]} onChange={(v) => dispatch({ type: 'setAnswer', qid: q.id, value: v })} />
-              ) : (
-                <p style={{ color: 'var(--critical)' }}>未知题型:{q.type}</p>
-              )}
-              {err && <p style={{ color: 'var(--critical)', fontSize: 12, marginTop: 8 }}>{err}</p>}
+      <div className="fill-wrap">
+        {/* 签名:作答路径栏 */}
+        <aside className="fill-rail" aria-label="作答路径">
+          <div className="eyebrow">你的作答路径</div>
+          <div className="meter"><span className="big">{pct}</span><span className="u">%</span></div>
+          <div className="msub">
+            已答 {answeredCount} / {visible.length} 可见题
+            {skipCount > 0 && ` · ${skipCount} 题按你的选择跳过`}
+          </div>
+          <div className="bar"><i style={{ width: `${pct}%` }} /></div>
+          <ul className="fill-path">
+            {nodes.map(({ qid, no, title, status, srcNo }) => {
+              const short = title.length > 15 ? `${title.slice(0, 14)}…` : title;
+              const why =
+                status === 'skip' && srcNo
+                  ? `因 Q${srcNo} 的选择跳过`
+                  : status === 'miss'
+                    ? '必答 · 待完成'
+                    : '';
+              return (
+                <li key={qid}>
+                  <button
+                    type="button"
+                    className={status ? `fnode ${status}` : 'fnode'}
+                    onClick={() => status !== 'skip' && jump(qid)}
+                    disabled={status === 'skip'}
+                  >
+                    <span className="dot" />
+                    <span className="qn">Q{no}</span>
+                    <span className="lbl">{short}</span>
+                    {why && <span className="why">{why}</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </aside>
+
+        {/* 作答列:复用 .a-* 作答组件 */}
+        <main className="fill-col">
+          <div className="fill-head">
+            <h1 id="fill-title">{schema.title}</h1>
+            <p className="desc">感谢参与这份调研。全程匿名,你的回答只用于产品改进。</p>
+            <div className="meta">
+              <span>共 <b>{visible.length}</b> 题</span>
+              <span>约 2 分钟</span>
+              <span>匿名作答</span>
             </div>
-          );
-        })}
-      </div>
+          </div>
 
-      <div className="a-submit">
-        <button type="button" className="btn primary" onClick={onSubmit}>提交问卷</button>
+          {/* 提交进行中锁住作答区:防止 onSubmit 已捕获 answers 快照后,用户再改动导致
+              "改动进了 localStorage 但没进本次提交,成功后又被清盘"的静默丢失(⑥ 复核 defect 1)。 */}
+          <div className="a-body" style={submitting ? { pointerEvents: 'none', opacity: 0.6 } : undefined} aria-busy={submitting}>
+            {visible.map((q, i) => {
+              const Answer = getAnswer(q.type);
+              const err = errorOf(q.id);
+              // 必答红 = 已尝试提交 && 必答 && 当前仍未答(live,与路径栏 miss 同源;
+              // 编辑补填后即时消红,不依赖会被 setAnswer 清空的 errors 数组)。
+              const invalid = (tried && q.required && !isAnswered(answers[q.id])) || !!err;
+              return (
+                <div key={q.id} id={`q-${q.id}`} className={`a-q${invalid ? ' invalid' : ''}`}>
+                  <div className="qt">
+                    {q.required && <span className="req">* </span>}
+                    <span className="no">Q{i + 1}</span> {q.title}
+                  </div>
+                  {Answer ? (
+                    <Answer question={q} value={answers[q.id]} onChange={(v) => { if (!submitting) dispatch({ type: 'setAnswer', qid: q.id, value: v }); }} />
+                  ) : (
+                    <p style={{ color: 'var(--critical)' }}>未知题型:{q.type}</p>
+                  )}
+                  {err && <p style={{ color: 'var(--critical)', fontSize: 12, marginTop: 8 }}>{err}</p>}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="fill-foot">
+            <div className="a-submit" style={{ flex: 'none' }}>
+              <button type="button" className="btn primary" onClick={() => void onSubmit()} disabled={submitting}>
+                {submitting ? '提交中…' : '提交问卷'}
+              </button>
+            </div>
+            <span className="note" role={submitError || missCount > 0 ? 'alert' : undefined}>
+              {submitError
+                ? submitError
+                : missCount > 0
+                  ? `还有 ${missCount} 道必答题待完成`
+                  : '提交后不可修改;答案已本地暂存,可随时回来续答。'}
+            </span>
+          </div>
+        </main>
       </div>
-    </main>
+    </>
   );
 }
