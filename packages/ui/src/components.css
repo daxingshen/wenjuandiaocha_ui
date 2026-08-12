@@ -342,6 +342,41 @@ table.cross tr.total th, table.cross tr.total td, table.cross td.total { backgro
 .link-box { display: flex; gap: 8px; margin: 8px 0 4px; }
 .link-box input { flex: 1; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); font: inherit; color: var(--ink-2); }
 
+/* 生命周期面板:状态 / 回收量 / 说明 / 主动作,收进一个有边界的容器,状态用色标识。
+   顶栏按状态着色(进行中=good 绿 / 已暂停=warning 琥珀 / 待发布=中性),说明文案落在有边界的 body 内。 */
+.lc-panel { margin-top: 16px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.lc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--line-soft); }
+.lc-panel.is-live .lc-head { background: color-mix(in srgb, var(--good) 9%, var(--surface)); }
+.lc-panel.is-paused .lc-head { background: color-mix(in srgb, var(--warning) 12%, var(--surface)); }
+.lc-panel.is-draft .lc-head { background: var(--surface-2); }
+.lc-chip { display: inline-flex; align-items: center; gap: 8px; font-weight: 650; font-size: 13px; color: var(--ink); }
+.lc-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--ink-muted); }
+.lc-panel.is-live .lc-dot { background: var(--good); animation: lc-pulse 2s ease-out infinite; }
+.lc-panel.is-paused .lc-dot { background: var(--warning); }
+.lc-panel.is-draft .lc-dot { background: var(--brand); }
+.lc-recv { font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+.lc-recv b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.lc-body { padding: 13px 14px; }
+.lc-hint { font-size: 12.5px; color: var(--ink-2); line-height: 1.6; margin: 0 0 12px; }
+.lc-act { width: 100%; justify-content: center; padding: 11px; font-size: 14px; }
+.lc-note { margin-top: 10px; font-size: 12px; color: var(--ink-muted); }
+.lc-note.err { color: var(--critical); }
+@keyframes lc-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 45%, transparent); }
+  70% { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lc-panel.is-live .lc-dot { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 20%, transparent); }
+}
+
+/* 暂停(warn)按钮:琥珀底 + 琥珀边,用于「暂停发布」这类中性但需醒目、非破坏性的动作。 */
+.btn.warn { background: color-mix(in srgb, var(--warning) 15%, var(--surface)); border-color: color-mix(in srgb, var(--warning) 45%, var(--line)); color: color-mix(in srgb, var(--warning) 55%, var(--ink)); }
+.btn.warn:hover { background: color-mix(in srgb, var(--warning) 22%, var(--surface)); border-color: color-mix(in srgb, var(--warning) 70%, var(--line)); }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+/* 已淡化的渠道行内按钮不再叠一层 .55(避免 .55×.55≈.30 过淡);行整体已表达禁用。 */
+.channel.disabled .btn:disabled { opacity: 1; }
+
 /* ============ 响应式 ============ */
 @media (max-width: 960px) {
   .stat-row { grid-template-columns: repeat(2, 1fr); }

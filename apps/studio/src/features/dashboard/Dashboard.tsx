@@ -182,7 +182,7 @@ export function Dashboard() {
                     </div>
                     <div className="ops">
                       <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/edit`)}>✏️ 编辑设计</button>
-                      {/* 发布/重新发布/结束/重新打开等生命周期动作集中在发布页(发送分享),看板列表只做导航。 */}
+                      {/* 发布/暂停/继续等生命周期动作集中在发布页(发送分享),看板列表只做导航。 */}
                       <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/publish`)}>📤 发送分享</button>
                       <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/analyze`)}>📊 分析下载</button>
                       <div className="spring" />
