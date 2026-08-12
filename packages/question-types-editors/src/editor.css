@@ -7,8 +7,8 @@
 .field { margin-bottom: 16px; }
 .field label { display: block; font-size: 12.5px; color: var(--ink-2, #52514e); font-weight: 500; margin-bottom: 6px; }
 .field input[type=text], .field input[type=password], .field input[type=number], .field select, .field textarea {
-  width: 100%; padding: 10px 12px; border: 1px solid var(--line, #e1e0d9); border-radius: 8px; font: inherit; background: var(--surface-2, #fcfcfb); color: var(--ink, #0b0b0b); }
-.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--brand, #2a78d6); }
+  width: 100%; padding: 10px 12px; border: 1px solid var(--line, #e1e0d9); border-radius: 9px; font: inherit; background: var(--surface-2, #fcfcfb); color: var(--ink, #0b0b0b); transition: border-color .15s, box-shadow .15s, background .15s; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--brand, #2a78d6); background: var(--surface, #fff); box-shadow: 0 0 0 3px var(--brand-weak, #eaf2fc); }
 
 .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line-soft, rgba(11, 11, 11, 0.06)); }
 .toggle-row span { font-size: 13px; color: var(--ink-2, #52514e); }
@@ -20,9 +20,9 @@
 /* ============ 题型设置子块(选项/行列编辑) ============ */
 .set-group h5 { font-size: 12px; font-weight: 600; color: var(--ink-2, #52514e); margin: 16px 0 8px; }
 .opt-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
-.opt-row input { flex: 1; padding: 8px 10px; border: 1px solid var(--line, #e1e0d9); border-radius: 8px; font: inherit; background: var(--surface-2, #fcfcfb); color: var(--ink, #0b0b0b); }
-.opt-row input:focus { outline: none; border-color: var(--brand, #2a78d6); }
-.opt-row .del { width: 30px; height: 30px; border: 1px solid var(--line, #e1e0d9); border-radius: 8px; background: var(--surface-2, #fcfcfb); color: var(--ink-muted, #898781); flex: none; cursor: pointer; }
+.opt-row input { flex: 1; padding: 8px 10px; border: 1px solid var(--line, #e1e0d9); border-radius: 8px; font: inherit; background: var(--surface-2, #fcfcfb); color: var(--ink, #0b0b0b); transition: border-color .15s, box-shadow .15s, background .15s; }
+.opt-row input:focus { outline: none; border-color: var(--brand, #2a78d6); background: var(--surface, #fff); box-shadow: 0 0 0 3px var(--brand-weak, #eaf2fc); }
+.opt-row .del { width: 30px; height: 30px; border: 1px solid var(--line, #e1e0d9); border-radius: 8px; background: var(--surface-2, #fcfcfb); color: var(--ink-muted, #898781); flex: none; cursor: pointer; transition: .15s; }
 .opt-row .del:hover { border-color: var(--critical, #d03b3b); color: var(--critical, #d03b3b); }
 /* border/background/cursor 原由 components.css 全局 button reset 提供;此处显式补齐以脱离该依赖。 */
 .add-opt { font-size: 13px; color: var(--brand, #2a78d6); font-weight: 600; padding: 4px 0; border: none; background: none; cursor: pointer; }
