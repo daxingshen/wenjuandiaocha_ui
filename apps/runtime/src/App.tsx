@@ -81,7 +81,7 @@ export function App() {
       .then((schema) => alive && setLoad({ status: 'ready', schema, demo: false }))
       .catch((e: unknown) => {
         if (!alive) return;
-        const notFound = e instanceof ApiError && e.status === 404;
+        const notFound = e instanceof ApiError && e.notFound;
         setLoad({
           status: 'error',
           notFound,

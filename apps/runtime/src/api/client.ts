@@ -1,46 +1,94 @@
 /**
  * runtime 专属 HTTP:公开只读加载 schema + 提交答卷。无鉴权(匿名作答,决策 7)。
- * 与 studio 的 client 刻意分开:信任边界与端点不同,不过早共享(见目录设计决策)。
  *
- * 错误一律抛 ApiError(带 status),让 UI 分级处理:
- * 加载 404 → "问卷不存在/未发布/已结束";提交 400 → 后端权威校验错误;429 → 限频;5xx/网络 → 可重试。
+ * 统一响应信封(后端 render.go):业务响应恒 HTTP 200,body = { code, message, data }。
+ *   - code=0 成功,data 为负载(schema 对象 / {rows} 等)。
+ *   - code!=0 业务错,message 为对外文案;校验失败 code=42201,data.errors 为逐题错误。
+ * 框架层失败(限频 429、网络、路由/panic 等)仍走原生非-2xx HTTP 状态,不进信封。
+ *
+ * 错误一律抛 ApiError(带 code + status),让 UI 分级处理:
+ * 加载 code=40401(或原生 404)→ "不存在/未发布/已结束";提交 code=42201 → 逐题校验错;
+ * 原生 429 → 限频;5xx/网络 → 可重试。
  */
 import type { Answers, SurveySchema, ValidationError } from '@xingjuan/engine';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '/api';
 
-/** 带 HTTP status 的错误。status=0 表示网络层失败(fetch reject,未拿到响应)。 */
+/** 业务错误码(对齐后端 internal/ecode)。0=成功。 */
+export const Code = {
+  OK: 0,
+  BadRequest: 40001,
+  Unauthorized: 40101,
+  NotFound: 40401,
+  Validation: 42201,
+  TooManyRequests: 42901,
+  Conflict: 40901,
+  Internal: 50001,
+} as const;
+
+/**
+ * 带业务 code 与 HTTP status 的错误。
+ * - code:信封业务码(信封化响应);原生非-2xx 时为 undefined。
+ * - status:HTTP 状态(原生失败用它分级);信封业务错恒 200。
+ * - status=0 表示网络层失败(fetch reject,未拿到响应)。
+ */
 export class ApiError extends Error {
   readonly status: number;
-  /** 后端 400 校验失败时带回的逐题错误(对齐 render.go 的 {errors:[...]} 形状)。 */
+  readonly code?: number;
+  /** 后端校验失败(code=42201)带回的逐题错误(data.errors)。 */
   readonly validation?: ValidationError[];
-  constructor(status: number, message: string, validation?: ValidationError[]) {
+  constructor(status: number, message: string, code?: number, validation?: ValidationError[]) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.code = code;
     this.validation = validation;
   }
-}
 
-/** 读响应体里的错误信息;后端形状:{error:"…"} 或 {errors:[{qid,message}]}。 */
-async function parseError(res: Response): Promise<ApiError> {
-  let msg = `请求失败: ${res.status}`;
-  let validation: ValidationError[] | undefined;
-  try {
-    const body = (await res.json()) as { error?: string; errors?: ValidationError[] };
-    if (Array.isArray(body.errors)) {
-      validation = body.errors;
-      msg = body.errors[0]?.message ?? msg;
-    } else if (typeof body.error === 'string') {
-      msg = body.error;
-    }
-  } catch {
-    // 非 JSON 响应体:保留默认 msg
+  /** 语义:资源不存在/未发布/已结束(信封 40401 或原生 404)。 */
+  get notFound(): boolean {
+    return this.code === Code.NotFound || (this.code === undefined && this.status === 404);
   }
-  return new ApiError(res.status, msg, validation);
 }
 
-/** 按发布 id 拉取问卷 schema(公开只读)。失败抛 ApiError(404=不存在/未发布/已结束)。 */
+interface Envelope<T> {
+  code: number;
+  message: string;
+  data: T;
+}
+
+/**
+ * 统一取响应:
+ * - HTTP 非 2xx(框架层失败)→ 抛 ApiError(带原生 status,尝试读旧 {error} 文案)。
+ * - HTTP 2xx → 解信封;code!=0 抛 ApiError(带 code + data.errors);code=0 返回 data。
+ */
+async function take<T>(res: Response, netMsg: string): Promise<T> {
+  if (!res.ok) {
+    // 框架层失败(限频 429、5xx、路由 404 等):无信封,尽量读 {error} 文案。
+    let msg = `请求失败: ${res.status}`;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (typeof body.error === 'string') msg = body.error;
+    } catch {
+      // 非 JSON:保留默认
+    }
+    throw new ApiError(res.status, msg);
+  }
+  let env: Envelope<T>;
+  try {
+    env = (await res.json()) as Envelope<T>;
+  } catch {
+    throw new ApiError(res.status, netMsg);
+  }
+  if (env.code !== Code.OK) {
+    const validation = (env.data as { errors?: ValidationError[] } | null)?.errors;
+    const msg = env.message || validation?.[0]?.message || `请求失败: ${env.code}`;
+    throw new ApiError(res.status, msg, env.code, Array.isArray(validation) ? validation : undefined);
+  }
+  return env.data;
+}
+
+/** 按发布 id 拉取问卷 schema(公开只读)。失败抛 ApiError(notFound=不存在/未发布/已结束)。 */
 export async function fetchSurvey(id: string): Promise<SurveySchema> {
   let res: Response;
   try {
@@ -48,14 +96,13 @@ export async function fetchSurvey(id: string): Promise<SurveySchema> {
   } catch {
     throw new ApiError(0, '网络异常,无法加载问卷');
   }
-  if (!res.ok) throw await parseError(res);
-  return res.json() as Promise<SurveySchema>;
+  return take<SurveySchema>(res, '加载失败,请稍后重试');
 }
 
 /**
  * 提交答卷。前端已跑 validate/normalize 仅为体验;
  * 后端提交时必须完整重跑校验+normalize,永不信任客户端(决策 6 安全底线)。
- * 成功返回后端权威的规范化行数;失败抛 ApiError(400 带 validation,429 限频,5xx 服务端)。
+ * 成功返回后端权威的规范化行数;失败抛 ApiError(code=42201 带 validation,原生 429 限频,5xx 服务端)。
  */
 export async function submitAnswers(surveyId: string, version: number, answers: Answers): Promise<{ rows: number }> {
   let res: Response;
@@ -70,7 +117,6 @@ export async function submitAnswers(surveyId: string, version: number, answers: 
   } catch {
     throw new ApiError(0, '网络异常,提交未成功');
   }
-  if (!res.ok) throw await parseError(res);
-  const body = (await res.json().catch(() => ({}))) as { rows?: number };
-  return { rows: typeof body.rows === 'number' ? body.rows : 0 };
+  const data = await take<{ rows?: number } | null>(res, '提交未成功,请稍后重试');
+  return { rows: typeof data?.rows === 'number' ? data.rows : 0 };
 }
