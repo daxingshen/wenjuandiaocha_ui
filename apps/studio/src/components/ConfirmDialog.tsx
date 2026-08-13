@@ -14,6 +14,8 @@ export interface ConfirmDialogProps {
   confirmLabel?: string;
   /** 处理中(禁用按钮、改文案) */
   busy?: boolean;
+  /** 隐藏取消按钮:用于纯告知型拦截(只有一个「知道了」动作,无"取消"语义)。默认 false,不影响既有二次确认调用。 */
+  hideCancel?: boolean;
   /** 确认动作 */
   onConfirm: () => void;
   /** 取消:关闭弹窗,不执行动作 */
@@ -26,6 +28,7 @@ export function ConfirmDialog({
   body,
   confirmLabel = '确认',
   busy = false,
+  hideCancel = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -36,9 +39,11 @@ export function ConfirmDialog({
         <div className="modal-title">{title}</div>
         <div className="modal-body">{body}</div>
         <div className="modal-actions">
-          <button className="btn sm" disabled={busy} onClick={onCancel}>
-            取消
-          </button>
+          {!hideCancel && (
+            <button className="btn sm" disabled={busy} onClick={onCancel}>
+              取消
+            </button>
+          )}
           <button className="btn primary sm" disabled={busy} onClick={onConfirm}>
             {busy ? '处理中…' : confirmLabel}
           </button>

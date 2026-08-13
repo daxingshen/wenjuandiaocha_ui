@@ -26,17 +26,33 @@ interface Envelope<T> {
 }
 
 /**
+ * API 错误:携带业务错误码(code)供调用方分流处理(如 40901 已发布不可编辑)。
+ * 框架层失败(非 2xx,无信封)时 code 为 undefined,只有 httpStatus。
+ * 继承 Error,message 仍可用,既有只读 message 的 catch 不受影响。
+ */
+export class ApiError extends Error {
+  readonly code?: number;
+  readonly httpStatus?: number;
+  constructor(message: string, opts: { code?: number; httpStatus?: number }) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = opts.code;
+    this.httpStatus = opts.httpStatus;
+  }
+}
+
+/**
  * 统一取响应:
- * - HTTP 非 2xx(框架层失败,如未登录 401)→ 抛 Error。
- * - HTTP 2xx → 解信封;code!=0 抛 Error(message);code=0 返回 data。
+ * - HTTP 非 2xx(框架层失败,如未登录 401)→ 抛 ApiError(httpStatus)。
+ * - HTTP 2xx → 解信封;code!=0 抛 ApiError(code, message);code=0 返回 data。
  */
 async function take<T>(res: Response, path: string, method: string): Promise<T> {
   if (!res.ok) {
-    throw new Error(`${method} ${path} 失败: ${res.status}`);
+    throw new ApiError(`${method} ${path} 失败: ${res.status}`, { httpStatus: res.status });
   }
   const env = (await res.json()) as Envelope<T>;
   if (env.code !== Code.OK) {
-    throw new Error(env.message || `${method} ${path} 失败: ${env.code}`);
+    throw new ApiError(env.message || `${method} ${path} 失败: ${env.code}`, { code: env.code });
   }
   return env.data;
 }
