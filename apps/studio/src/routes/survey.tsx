@@ -12,13 +12,16 @@ import { RequireAuth } from '../features/auth/RequireAuth.js';
 import { TopBar } from '../components/TopBar.js';
 import { NotFound } from '../components/NotFound.js';
 import { SaveDialog } from '../components/SaveDialog.js';
+import { ConfirmDialog } from '../components/ConfirmDialog.js';
 import { Editor } from '../features/editor/Editor.js';
 import { Analysis } from '../features/analysis/Analysis.js';
 import { Preview } from '../features/preview/Preview.js';
 import { Publish } from '../features/publish/Publish.js';
 import { useEditorStore } from '../features/editor/useEditorStore.js';
 import type { SurveySchema } from '@xingjuan/engine';
-import { getSurvey, saveSurvey, createSurvey } from '../api/surveys.js';
+import { getSurvey, getSurveyStats, saveSurvey, createSurvey } from '../api/surveys.js';
+import { ApiError, Code } from '../api/client.js';
+import { canEditSurvey } from '../features/dashboard/editGate.js';
 
 /** 新建时的空白内存草稿(未落库,首存前只存在于编辑器 store)。 */
 function emptyDraft(): SurveySchema {
@@ -44,11 +47,19 @@ export function SurveyRoute() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  // 编辑锁定态:直达 URL 进编辑页时,载入并行取状态,发现已发布(live/closed)则锁定,
+  // 编辑器根本不渲染。这一步就拦住了非法编辑;后端 40901 是最终防线。
+  const [locked, setLocked] = useState(false);
 
   // :id==='new' 是内存草稿态:不调后端(避免 404),直接载入空白草稿,首存时才落库。
-  // 其余按 :id 从后端载入草稿 schema 进编辑器 store。id 变才重载。
+  // 其余按 :id 从后端载入草稿 schema 进编辑器 store。id 或 tab 变才重载。
+  //
+  // 编辑页额外守卫:直接在浏览器输入 /survey/:id/edit 会绕过看板的入口拦截。
+  // 载入时并行取状态,已发布(live/closed)则锁定、不渲染编辑器、弹告知窗。
+  // 预览/发布/分析页不锁(仅编辑受限)。后端 40901 仍是最终防线。
   useEffect(() => {
     if (!id) return;
+    setLocked(false);
     if (id === 'new') {
       load(emptyDraft());
       setLoadState('ready');
@@ -56,9 +67,15 @@ export function SurveyRoute() {
     }
     let alive = true;
     setLoadState('loading');
-    getSurvey(id)
-      .then((s) => {
+    const needGuard = tab === 'edit';
+    Promise.all([getSurvey(id), needGuard ? getSurveyStats(id) : Promise.resolve(null)])
+      .then(([s, stats]) => {
         if (!alive) return;
+        if (stats && !canEditSurvey(stats.status)) {
+          setLocked(true);
+          setLoadState('ready');
+          return; // 不 load 进编辑器 store,不渲染编辑器
+        }
         load(s);
         setLoadState('ready');
       })
@@ -66,7 +83,7 @@ export function SurveyRoute() {
     return () => {
       alive = false;
     };
-  }, [id, load]);
+  }, [id, tab, load]);
 
   // 未知 tab(如 /survey/:id/publsh 拼错):不静默回退,统一走默认 404 页,让错误可见。
   const isTab = (t: string | undefined): t is TabKey => TABS.some((x) => x.key === t);
@@ -105,8 +122,15 @@ export function SurveyRoute() {
       } else {
         setNotice('已保存');
       }
-    } catch {
-      setNotice('保存失败');
+    } catch (e) {
+      // 40901 = 问卷已发布、内容锁定(仅在旧标签页等边缘情况可达,正常入口已被载入守卫拦住)。
+      // 关掉保存弹窗,给出明确提示;其余错误保留原「保存失败」。
+      setSaveDialogOpen(false);
+      if (e instanceof ApiError && e.code === Code.Conflict) {
+        setNotice('问卷已发布,内容已锁定,无法保存');
+      } else {
+        setNotice('保存失败');
+      }
     } finally {
       setSaving(false);
     }
@@ -135,6 +159,10 @@ export function SurveyRoute() {
         return <button className="btn sm" onClick={() => navigate('/home')}>返回</button>;
       case 'edit':
       default:
+        // 锁定态(已发布)不给编辑动作,只留返回。
+        if (locked) {
+          return <button className="btn sm" onClick={() => navigate('/home')}>返回</button>;
+        }
         return (
           <>
             <button className="btn sm" onClick={() => navigate(`/survey/${id}/preview`)}>预览</button>
@@ -155,7 +183,7 @@ export function SurveyRoute() {
               style={{ marginLeft: 12, border: 'none', background: 'transparent', outline: 'none', font: 'inherit', color: 'inherit', minWidth: 200 }}
               value={schema?.title ?? ''}
               placeholder={`问卷 ${id}`}
-              disabled={loadState !== 'ready'}
+              disabled={loadState !== 'ready' || locked}
               onChange={(e) => setTitle(e.target.value)}
               aria-label="问卷标题"
             />
@@ -171,7 +199,10 @@ export function SurveyRoute() {
         <div style={{ flex: 1, overflow: 'auto', background: 'var(--page)' }}>
           {loadState === 'loading' && <p style={{ color: 'var(--ink-muted)', padding: 24 }}>加载中…</p>}
           {loadState === 'error' && <p style={{ color: 'var(--critical)', padding: 24 }}>加载问卷失败</p>}
-          {loadState === 'ready' && (
+          {loadState === 'ready' && locked && (
+            <p style={{ color: 'var(--ink-muted)', padding: 24 }}>这份问卷已发布,内容已锁定,不能编辑。</p>
+          )}
+          {loadState === 'ready' && !locked && (
             <>
               {tab === 'edit' && <Editor />}
               {tab === 'preview' && <Preview />}
@@ -187,6 +218,17 @@ export function SurveyRoute() {
           onSave={() => onSave(false)}
           onSaveAndBack={() => onSave(true)}
           onCancel={() => setSaveDialogOpen(false)}
+        />
+
+        {/* 直达 URL 进编辑页但问卷已发布:单按钮告知并送回看板(留在此页也改不了)。 */}
+        <ConfirmDialog
+          open={locked}
+          hideCancel
+          title="🔒 问卷已发布,内容已锁定"
+          body="这份问卷已发布,题目和结构已冻结,不能编辑——这是为了让已回收和后续答卷的数据口径一致。如需一份可改的版本,请新建问卷。"
+          confirmLabel="返回看板"
+          onConfirm={() => navigate('/home')}
+          onCancel={() => navigate('/home')}
         />
       </div>
     </RequireAuth>

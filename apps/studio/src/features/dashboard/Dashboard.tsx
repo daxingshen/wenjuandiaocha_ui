@@ -6,7 +6,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../auth/useAuthStore.js';
 import { TopBar } from '../../components/TopBar.js';
+import { ConfirmDialog } from '../../components/ConfirmDialog.js';
 import { listSurveys, type SurveyListItem } from '../../api/surveys.js';
+import { canEditSurvey } from './editGate.js';
 
 /** 类型 → 色板槽位 + 图标(对照原型 typeMeta / 类型色映射 UI 文档 §2.1)。 */
 const TYPE_META: Record<string, { color: string; ic: string; label: string }> = {
@@ -56,6 +58,8 @@ export function Dashboard() {
   const [surveys, setSurveys] = useState<SurveyListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // 已发布问卷被拦下的编辑尝试:持有被拦问卷,非空即弹拦截窗。null = 无拦截。
+  const [blocked, setBlocked] = useState<SurveyListItem | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -70,6 +74,13 @@ export function Dashboard() {
 
   // 新建:不再先落库,进内存草稿态编辑器(/survey/new),用户点保存才首存落库(零写入直到保存)。
   const onCreate = () => navigate('/survey/new/edit');
+
+  // 编辑入口守卫:仅草稿可进编辑器。已发布(进行中/已截止)问卷内容已冻结,弹窗拦下、不跳转。
+  // 这只是体验层;真正防线在后端 Update 接口(非草稿返 40901)。
+  const onEdit = (s: SurveyListItem) => {
+    if (canEditSurvey(s.status)) navigate(`/survey/${s.id}/edit`);
+    else setBlocked(s);
+  };
 
   const list = surveys.filter((s) => {
     if (filter === 'all') return true;
@@ -181,7 +192,7 @@ export function Dashboard() {
                       </div>
                     </div>
                     <div className="ops">
-                      <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/edit`)}>✏️ 编辑设计</button>
+                      <button className="btn sm" onClick={() => onEdit(s)}>✏️ 编辑设计</button>
                       {/* 发布/暂停/继续等生命周期动作集中在发布页(发送分享),看板列表只做导航。 */}
                       <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/publish`)}>📤 发送分享</button>
                       <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/analyze`)}>📊 分析下载</button>
@@ -195,6 +206,21 @@ export function Dashboard() {
           </div>
         </main>
       </div>
+
+      {/* 已发布问卷的编辑拦截:纯告知型(单按钮),点「知道了」关闭、留在看板。 */}
+      <ConfirmDialog
+        open={blocked !== null}
+        hideCancel
+        title="🔒 问卷已发布,内容已锁定"
+        body={
+          blocked
+            ? `「${blocked.title}」${STATUS_META[blocked.status]?.label ?? ''},题目和结构已冻结,不能再改——这是为了让已回收和后续答卷的数据口径一致。如需一份可改的版本,请新建问卷。`
+            : ''
+        }
+        confirmLabel="知道了"
+        onConfirm={() => setBlocked(null)}
+        onCancel={() => setBlocked(null)}
+      />
     </div>
   );
 }
