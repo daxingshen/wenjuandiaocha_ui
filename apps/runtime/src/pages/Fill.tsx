@@ -56,6 +56,9 @@ export function Fill({
 
   // 窄屏(≤960px)作答路径抽屉开合。桌面双栏常驻侧栏,不用此态。
   const [railOpen, setRailOpen] = useState(false);
+  // 提交失败弹窗:非校验类失败(无权限/会话失效/网络/服务端)用弹窗明确告知,而非仅底部小字。
+  // 校验类失败仍走逐题红 + 滚动,不弹窗(那是"补填"而非"出错")。
+  const [failModal, setFailModal] = useState<{ title: string; body: string } | null>(null);
 
   const jump = (qid: string) => {
     document.getElementById(`q-${qid}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -124,15 +127,21 @@ export function Fill({
       }
       // 无作答权限(creator 提交 login_required 问卷,40301):给身份类文案,而非「网络失败」。
       if (err.forbidden) {
-        dispatch({ type: 'submitFail', message: '你的账号不能作答这份问卷' });
+        const msg = '你的账号不能作答这份问卷。请用作答账号登录后再试。';
+        dispatch({ type: 'submitFail', message: msg });
+        setFailModal({ title: '无法提交', body: msg });
         return;
       }
       // 会话失效(401):提示重新登录。
       if (err.unauthorized) {
-        dispatch({ type: 'submitFail', message: '登录已过期,请刷新页面重新登录后再提交' });
+        const msg = '登录已过期,请刷新页面重新登录后再提交。';
+        dispatch({ type: 'submitFail', message: msg });
+        setFailModal({ title: '登录已过期', body: msg });
         return;
       }
+      // 其它(网络/429/5xx):留在本页可重试,弹窗告知具体原因。
       dispatch({ type: 'submitFail', message: err.message });
+      setFailModal({ title: '提交未成功', body: `${err.message}。你的答案已本地暂存,可稍后重试。` });
     }
   };
 
@@ -242,6 +251,19 @@ export function Fill({
               setRailOpen(false);
             })}
           </aside>
+        </div>
+      )}
+
+      {/* 提交失败弹窗(非校验类):明确告知原因 + 单「知道了」关闭。校验类走逐题红,不弹窗。 */}
+      {failModal && (
+        <div className="modal-mask" role="dialog" aria-modal="true" aria-label={failModal.title} onClick={() => setFailModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">{failModal.title}</div>
+            <div className="modal-body">{failModal.body}</div>
+            <div className="modal-actions">
+              <button type="button" className="btn primary" onClick={() => setFailModal(null)}>知道了</button>
+            </div>
+          </div>
         </div>
       )}
     </>

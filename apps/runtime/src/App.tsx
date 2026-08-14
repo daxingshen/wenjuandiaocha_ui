@@ -136,9 +136,13 @@ export function App() {
   return <Survey key={key} schema={load.schema} demo={load.demo} submit={submitAnswers} />;
 }
 
+/** 能作答的角色(对齐后端 rbac 能力位:respondent/admin 可提交,creator 不可)。 */
+const CAN_ANSWER_ROLES = new Set(['respondent', 'admin']);
+
 /**
  * login_required 问卷的登录闸门(方案A·D1/D4)。进入时探测一次 me():
  * 未登录展示 LoginGate,登录后同一 URL 不跳转、直接进 Survey(鉴权提交 + 头部登出)。
+ * 已登录但不能作答的账号(creator)在进入作答页前拦下,给换账号入口。
  */
 function Gated({ schema }: { schema: SurveySchema }) {
   const auth = useAuth();
@@ -168,6 +172,24 @@ function Gated({ schema }: { schema: SurveySchema }) {
   if (auth.status === 'anon' || !auth.user) {
     // 登录成功由 auth.login 置 authed,组件重渲染进 Survey;LoginGate 的 onDone 仅用于即时衔接。
     return <LoginGate surveyTitle={schema.title} login={auth.login} onDone={() => { /* 态已在 login 内置为 authed */ }} />;
+  }
+  // 已登录但当前账号不能作答(如 creator):在进入作答页前就拦下,给明确提示 + 换账号入口,
+  // 免得填完才在提交时被后端 403(与后端 rbac 能力位一致:respondent/admin 可,creator 不可)。
+  if (!CAN_ANSWER_ROLES.has(auth.user.role)) {
+    return (
+      <main style={{ fontFamily: 'var(--font)', textAlign: 'center', padding: 48, color: 'var(--ink)' }}>
+        <div style={{ fontSize: 44, marginBottom: 12 }}>🚫</div>
+        <p style={{ fontSize: 16, marginBottom: 4 }}>当前账号「{auth.user.name}」不能作答问卷</p>
+        <p style={{ color: 'var(--ink-muted)', fontSize: 14 }}>作答需要作答账号。请退出后用作答账号登录,或联系发放问卷的人。</p>
+        <button
+          type="button"
+          onClick={() => void auth.logout()}
+          style={{ marginTop: 20, padding: '10px 20px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--surface)', color: 'var(--ink)', cursor: 'pointer' }}
+        >
+          退出并换账号
+        </button>
+      </main>
+    );
   }
   const fillAuth: FillAuth = { name: auth.user.name, onLogout: () => void auth.logout() };
   return <Survey schema={schema} demo={false} submit={submitAnswersAuthed} auth={fillAuth} />;
