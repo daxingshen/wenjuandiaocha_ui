@@ -431,6 +431,11 @@ table.cross tr.total th, table.cross tr.total td, table.cross td.total { backgro
 .fill-top .logo .dot { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; background: var(--brand); color: #fff; font-size: 11px; }
 .fill-top .sp { flex: 1; }
 .fill-top .safe { font-size: 11.5px; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; }
+.fill-top .who { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.fill-top .who .name { color: var(--ink-2); font-weight: 600; }
+.fill-top .who .signout { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: 12px; padding: 4px 10px; border-radius: 7px; cursor: pointer; }
+.fill-top .who .signout:hover { color: var(--ink); border-color: var(--ink-muted); }
+.fill-top .who .signout:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 /* 窄屏顶部细进度(宽屏由左栏承担,隐藏) */
 .fill-thin { height: 3px; background: var(--line-soft); position: sticky; top: 52px; z-index: 19; display: none; }
 .fill-thin i { display: block; height: 100%; width: 0; background: var(--brand); transition: width .3s; }
@@ -527,3 +532,48 @@ table.cross tr.total th, table.cross tr.total td, table.cross td.total { backgro
     color: var(--ink-2); font-size: 14px;
   }
 }
+
+/* ── 作答端登录闸门(runtime LoginGate)──────────────────────────────
+   login_required 问卷未登录时的「入场券」。主角是问卷标题,不是平台。
+   .rgate-* 前缀独立于 studio 的 .login-*(创作者营销登录)与 runtime 的 .fill-*。 */
+.rgate-wrap { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: var(--page); position: relative; }
+.rgate-theme {
+  position: absolute; top: 20px; right: 20px; width: 36px; height: 36px;
+  border: 1px solid var(--line); background: var(--surface); border-radius: 9px;
+  cursor: pointer; font-size: 15px; color: var(--ink-2);
+}
+.rgate-card {
+  width: 100%; max-width: 420px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  animation: rgate-rise 180ms ease-out both;
+}
+/* 签名:封缄色带 —— 这份问卷的封口。 */
+.rgate-seal { height: 8px; background: var(--hero-grad); }
+.rgate-body { padding: 30px 32px 32px; }
+.rgate-eyebrow {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--s7); margin: 0 0 12px;
+}
+.rgate-title { font-size: 25px; font-weight: 700; line-height: 1.25; letter-spacing: -.01em; color: var(--ink); margin: 0; }
+.rgate-gate { font-size: 14px; color: var(--ink-muted); margin: 10px 0 26px; }
+.rgate-field { display: block; margin-bottom: 16px; }
+.rgate-field span { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 7px; }
+.rgate-field input {
+  width: 100%; box-sizing: border-box; height: 44px; padding: 0 13px;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2);
+  color: var(--ink); font-size: 15px; font-family: var(--font);
+}
+.rgate-field input:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; border-color: var(--brand); }
+.rgate-submit {
+  width: 100%; height: 46px; margin-top: 8px; border: none; border-radius: 9px;
+  background: var(--brand); color: #fff; font-size: 15px; font-weight: 600; font-family: var(--font);
+  cursor: pointer;
+}
+.rgate-submit:hover:not(:disabled) { filter: brightness(1.05); }
+.rgate-submit:disabled { opacity: .6; cursor: default; }
+.rgate-submit:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.rgate-error { color: var(--critical); font-size: 13px; margin: 14px 0 0; text-align: center; }
+@keyframes rgate-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .rgate-card { animation: none; } }
+@media (max-width: 480px) { .rgate-body { padding: 26px 22px 28px; } .rgate-title { font-size: 22px; } }

@@ -13,18 +13,30 @@
 import { useMemo, useState } from 'react';
 import { evaluate, validateSurvey, type SurveySchema } from '@xingjuan/engine';
 import { getAnswer } from '@xingjuan/question-types';
-import { ApiError, submitAnswers } from '../api/client.js';
+import { ApiError, type SubmitFn } from '../api/client.js';
 import { buildPath, isAnswered } from '../fillPath.js';
 import type { FillAction, FillState } from '../useFill.js';
+
+/** 已登录作答者的头部信息(login_required 路径注入):显示账号 + 提供退出换账号。 */
+export interface FillAuth {
+  name: string;
+  onLogout: () => void;
+}
 
 export function Fill({
   schema,
   state,
   dispatch,
+  submit,
+  auth,
 }: {
   schema: SurveySchema;
   state: FillState;
   dispatch: React.Dispatch<FillAction>;
+  /** 提交函数(方案A·D2):anonymous 注入匿名版,login_required 注入鉴权版。Fill 不感知登录。 */
+  submit: SubmitFn;
+  /** 已登录时的头部信息(仅 login_required 路径传入);anonymous 路径为 undefined。 */
+  auth?: FillAuth;
 }) {
   const { answers, errors, submitting, submitError, triedSubmit } = state;
   // 隐藏题是 answers 的纯派生;每次作答后重算(约束 3:逻辑求值器统一执行)
@@ -100,7 +112,7 @@ export function Fill({
     // 提交是权威落库的唯一凭据:必须等后端 200 才算成功,失败留在本页可重试(答案不清盘)
     dispatch({ type: 'submitStart' });
     try {
-      const { rows } = await submitAnswers(schema.id, schema.version, answers);
+      const { rows } = await submit(schema.id, schema.version, answers);
       dispatch({ type: 'done', rows });
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError(0, '提交未成功,请稍后重试');
@@ -108,6 +120,16 @@ export function Fill({
       if (err.validation && err.validation.length > 0) {
         dispatch({ type: 'showErrors', errors: err.validation });
         jump(err.validation[0]!.qid);
+        return;
+      }
+      // 无作答权限(creator 提交 login_required 问卷,40301):给身份类文案,而非「网络失败」。
+      if (err.forbidden) {
+        dispatch({ type: 'submitFail', message: '你的账号不能作答这份问卷' });
+        return;
+      }
+      // 会话失效(401):提示重新登录。
+      if (err.unauthorized) {
+        dispatch({ type: 'submitFail', message: '登录已过期,请刷新页面重新登录后再提交' });
         return;
       }
       dispatch({ type: 'submitFail', message: err.message });
@@ -121,7 +143,14 @@ export function Fill({
       <header className="fill-top">
         <div className="logo"><span className="dot">星</span>星卷</div>
         <div className="sp" />
-        <span className="safe">🔒 匿名 · 断点续答已开</span>
+        {auth ? (
+          <span className="who">
+            <span className="name">{auth.name}</span>
+            <button type="button" className="signout" onClick={auth.onLogout}>退出</button>
+          </span>
+        ) : (
+          <span className="safe">🔒 匿名 · 断点续答已开</span>
+        )}
       </header>
       <div className="fill-thin"><i style={{ width: `${pct}%` }} /></div>
 
@@ -133,11 +162,15 @@ export function Fill({
         <main className="fill-col">
           <div className="fill-head">
             <h1 id="fill-title">{schema.title}</h1>
-            <p className="desc">感谢参与这份调研。全程匿名,你的回答只用于产品改进。</p>
+            <p className="desc">
+              {auth
+                ? '感谢参与这份调研。你的回答与账号关联,只用于产品改进。'
+                : '感谢参与这份调研。全程匿名,你的回答只用于产品改进。'}
+            </p>
             <div className="meta">
               <span>共 <b>{visible.length}</b> 题</span>
               <span>约 2 分钟</span>
-              <span>匿名作答</span>
+              <span>{auth ? '登录作答' : '匿名作答'}</span>
             </div>
           </div>
 
