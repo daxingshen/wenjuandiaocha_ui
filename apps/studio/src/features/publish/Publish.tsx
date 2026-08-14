@@ -15,9 +15,10 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { publishSurvey, closeSurvey, reopenSurvey, getSurveyStats, type SurveyStats } from '../../api/surveys.js';
+import { publishSurvey, closeSurvey, reopenSurvey, getSurveyStats, setAnswerAccess, type SurveyStats, type AnswerAccess } from '../../api/surveys.js';
 import { ConfirmDialog } from '../../components/ConfirmDialog.js';
 import { answerLink, resolveRuntimeBase } from './publishLink.js';
+import { answerAccessControlMode } from './answerAccessControl.js';
 
 // 发布页采用「暂停/继续」词汇,故 closed 标为「已暂停」(与本页 close 按钮「暂停发布」自洽);
 // 看板列表沿用「已截止」不动(本轮不扩到看板),两处标签差异为已知非阻塞项。
@@ -80,6 +81,24 @@ export function Publish({ id, onGoEdit }: PublishProps) {
       setTimeout(() => setCopied(false), 1800);
     } catch {
       setNotice('复制失败,请手动复制链接');
+    }
+  };
+
+  // 切换作答访问模式(仅 draft 可改)。乐观更新 + 失败回滚;后端为唯一强制点。
+  const [accessBusy, setAccessBusy] = useState(false);
+  const onToggleAccess = async () => {
+    if (accessBusy || !stats) return;
+    const next: AnswerAccess = stats.answerAccess === 'login_required' ? 'anonymous' : 'login_required';
+    setAccessBusy(true);
+    setNotice('');
+    try {
+      await setAnswerAccess(id, next);
+      setStats({ ...stats, answerAccess: next });
+      setNotice(next === 'login_required' ? '已设为需登录作答' : '已设为匿名作答');
+    } catch {
+      setNotice('切换作答模式失败,请重试');
+    } finally {
+      setAccessBusy(false);
     }
   };
 
@@ -184,7 +203,35 @@ export function Publish({ id, onGoEdit }: PublishProps) {
 
           <div className="card chart-card">
             <div className="ct">回收控制</div>
-            <div className="cs">防刷与配额,保证样本质量(即将上线)</div>
+            <div className="cs">防刷与配额,保证样本质量</div>
+
+            {/* 作答访问模式。draft 可切;发布后(live/closed)锁定,纯文字回显;new 态无库行不显示。 */}
+            {stats && (
+              answerAccessControlMode(status) === 'editable' ? (
+                <div className="toggle-row">
+                  <div>
+                    <span>需登录才能作答</span>
+                    <div className="cd" style={{ marginTop: 2 }}>关闭后任何人凭链接可匿名作答</div>
+                  </div>
+                  <div
+                    className={`sw${stats.answerAccess === 'login_required' ? ' on' : ''}`}
+                    role="switch"
+                    aria-checked={stats.answerAccess === 'login_required'}
+                    aria-label="需登录才能作答"
+                    title="仅未发布时可改"
+                    onClick={() => { if (!accessBusy) void onToggleAccess(); }}
+                  />
+                </div>
+              ) : (
+                <div className="toggle-row" style={{ opacity: 0.7 }}>
+                  <span>作答访问模式</span>
+                  <span style={{ color: 'var(--ink-2)', fontSize: 13 }}>
+                    {stats.answerAccess === 'login_required' ? '需登录作答(发布后锁定)' : '匿名作答(发布后锁定)'}
+                  </span>
+                </div>
+              )
+            )}
+
             {SOON_CONTROLS.map((label) => (
               <div key={label} className="toggle-row" style={{ opacity: 0.55 }}>
                 <span>{label}</span>

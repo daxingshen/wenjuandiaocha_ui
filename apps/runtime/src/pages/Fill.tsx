@@ -13,18 +13,30 @@
 import { useMemo, useState } from 'react';
 import { evaluate, validateSurvey, type SurveySchema } from '@xingjuan/engine';
 import { getAnswer } from '@xingjuan/question-types';
-import { ApiError, submitAnswers } from '../api/client.js';
+import { ApiError, type SubmitFn } from '../api/client.js';
 import { buildPath, isAnswered } from '../fillPath.js';
 import type { FillAction, FillState } from '../useFill.js';
+
+/** 已登录作答者的头部信息(login_required 路径注入):显示账号 + 提供退出换账号。 */
+export interface FillAuth {
+  name: string;
+  onLogout: () => void;
+}
 
 export function Fill({
   schema,
   state,
   dispatch,
+  submit,
+  auth,
 }: {
   schema: SurveySchema;
   state: FillState;
   dispatch: React.Dispatch<FillAction>;
+  /** 提交函数(方案A·D2):anonymous 注入匿名版,login_required 注入鉴权版。Fill 不感知登录。 */
+  submit: SubmitFn;
+  /** 已登录时的头部信息(仅 login_required 路径传入);anonymous 路径为 undefined。 */
+  auth?: FillAuth;
 }) {
   const { answers, errors, submitting, submitError, triedSubmit } = state;
   // 隐藏题是 answers 的纯派生;每次作答后重算(约束 3:逻辑求值器统一执行)
@@ -44,6 +56,9 @@ export function Fill({
 
   // 窄屏(≤960px)作答路径抽屉开合。桌面双栏常驻侧栏,不用此态。
   const [railOpen, setRailOpen] = useState(false);
+  // 提交失败弹窗:非校验类失败(无权限/会话失效/网络/服务端)用弹窗明确告知,而非仅底部小字。
+  // 校验类失败仍走逐题红 + 滚动,不弹窗(那是"补填"而非"出错")。
+  const [failModal, setFailModal] = useState<{ title: string; body: string } | null>(null);
 
   const jump = (qid: string) => {
     document.getElementById(`q-${qid}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -100,7 +115,7 @@ export function Fill({
     // 提交是权威落库的唯一凭据:必须等后端 200 才算成功,失败留在本页可重试(答案不清盘)
     dispatch({ type: 'submitStart' });
     try {
-      const { rows } = await submitAnswers(schema.id, schema.version, answers);
+      const { rows } = await submit(schema.id, schema.version, answers);
       dispatch({ type: 'done', rows });
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError(0, '提交未成功,请稍后重试');
@@ -110,7 +125,23 @@ export function Fill({
         jump(err.validation[0]!.qid);
         return;
       }
+      // 无作答权限(creator 提交 login_required 问卷,40301):给身份类文案,而非「网络失败」。
+      if (err.forbidden) {
+        const msg = '你的账号不能作答这份问卷。请用作答账号登录后再试。';
+        dispatch({ type: 'submitFail', message: msg });
+        setFailModal({ title: '无法提交', body: msg });
+        return;
+      }
+      // 会话失效(401):提示重新登录。
+      if (err.unauthorized) {
+        const msg = '登录已过期,请刷新页面重新登录后再提交。';
+        dispatch({ type: 'submitFail', message: msg });
+        setFailModal({ title: '登录已过期', body: msg });
+        return;
+      }
+      // 其它(网络/429/5xx):留在本页可重试,弹窗告知具体原因。
       dispatch({ type: 'submitFail', message: err.message });
+      setFailModal({ title: '提交未成功', body: `${err.message}。你的答案已本地暂存,可稍后重试。` });
     }
   };
 
@@ -121,7 +152,14 @@ export function Fill({
       <header className="fill-top">
         <div className="logo"><span className="dot">星</span>星卷</div>
         <div className="sp" />
-        <span className="safe">🔒 匿名 · 断点续答已开</span>
+        {auth ? (
+          <span className="who">
+            <span className="name">{auth.name}</span>
+            <button type="button" className="signout" onClick={auth.onLogout}>退出</button>
+          </span>
+        ) : (
+          <span className="safe">🔒 匿名 · 断点续答已开</span>
+        )}
       </header>
       <div className="fill-thin"><i style={{ width: `${pct}%` }} /></div>
 
@@ -133,11 +171,15 @@ export function Fill({
         <main className="fill-col">
           <div className="fill-head">
             <h1 id="fill-title">{schema.title}</h1>
-            <p className="desc">感谢参与这份调研。全程匿名,你的回答只用于产品改进。</p>
+            <p className="desc">
+              {auth
+                ? '感谢参与这份调研。你的回答与账号关联,只用于产品改进。'
+                : '感谢参与这份调研。全程匿名,你的回答只用于产品改进。'}
+            </p>
             <div className="meta">
               <span>共 <b>{visible.length}</b> 题</span>
               <span>约 2 分钟</span>
-              <span>匿名作答</span>
+              <span>{auth ? '登录作答' : '匿名作答'}</span>
             </div>
           </div>
 
@@ -209,6 +251,19 @@ export function Fill({
               setRailOpen(false);
             })}
           </aside>
+        </div>
+      )}
+
+      {/* 提交失败弹窗(非校验类):明确告知原因 + 单「知道了」关闭。校验类走逐题红,不弹窗。 */}
+      {failModal && (
+        <div className="modal-mask" role="dialog" aria-modal="true" aria-label={failModal.title} onClick={() => setFailModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">{failModal.title}</div>
+            <div className="modal-body">{failModal.body}</div>
+            <div className="modal-actions">
+              <button type="button" className="btn primary" onClick={() => setFailModal(null)}>知道了</button>
+            </div>
+          </div>
         </div>
       )}
     </>

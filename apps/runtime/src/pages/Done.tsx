@@ -1,14 +1,22 @@
 /** 提交完成页。答案已提交(后端权威),本地已清盘。提供再填一份。
  *  沿用作答页的桌面顶栏(.fill-top),提交前后视觉连续。 */
 import type { FillAction } from '../useFill.js';
+import type { FillAuth } from './Fill.js';
 
-export function Done({ rows, dispatch }: { rows: number; dispatch: React.Dispatch<FillAction> }) {
+export function Done({ rows, dispatch, auth }: { rows: number; dispatch: React.Dispatch<FillAction>; auth?: FillAuth }) {
   return (
     <>
       <header className="fill-top">
         <div className="logo"><span className="dot">星</span>星卷</div>
         <div className="sp" />
-        <span className="safe">🔒 匿名作答</span>
+        {auth ? (
+          <span className="who">
+            <span className="name">{auth.name}</span>
+            <button type="button" className="signout" onClick={auth.onLogout}>退出</button>
+          </span>
+        ) : (
+          <span className="safe">🔒 匿名作答</span>
+        )}
       </header>
       <main
         style={{
