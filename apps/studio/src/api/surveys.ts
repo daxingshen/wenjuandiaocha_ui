@@ -14,6 +14,9 @@ export interface SurveyListItem {
   updatedAt: string;
 }
 
+/** 作答访问模式(对齐后端 domain.AnswerAccess)。 */
+export type AnswerAccess = 'anonymous' | 'login_required';
+
 /** 单卷发布态统计(发布回收页用)。回收量来自 responses 计数。 */
 export interface SurveyStats {
   /** draft|live|closed */
@@ -22,6 +25,8 @@ export interface SurveyStats {
   publishedVersion: number | null;
   /** 已回收答卷数。 */
   responseCount: number;
+  /** 作答访问模式:anonymous 免登录 / login_required 需登录(发布页回显与切换)。 */
+  answerAccess: AnswerAccess;
 }
 
 import { apiGet, apiSend } from './client.js';
@@ -72,7 +77,15 @@ export async function reopenSurvey(id: string): Promise<void> {
   await apiSend<{ ok: boolean }>(`/surveys/${id}/reopen`, 'POST');
 }
 
-/** 取单卷发布态统计(status + 已发布版本 + 回收量)。归属校验,非本人后端 404。 */
+/** 取单卷发布态统计(status + 已发布版本 + 回收量 + 作答模式)。归属校验,非本人后端 404。 */
 export async function getSurveyStats(id: string): Promise<SurveyStats> {
   return apiGet<SurveyStats>(`/surveys/${id}/stats`);
+}
+
+/**
+ * 设作答访问模式(仅 draft 可改)。后端守卫:非 draft → 409,非 owner → 404,非法值 → 400。
+ * 发布不再设定作答模式,故此为唯一写入入口。
+ */
+export async function setAnswerAccess(id: string, answerAccess: AnswerAccess): Promise<void> {
+  await apiSend<null>(`/surveys/${id}/answer-access`, 'PATCH', { answerAccess });
 }
