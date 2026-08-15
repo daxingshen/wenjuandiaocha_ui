@@ -1,14 +1,14 @@
-/** 矩阵单选作答态渲染。runtime 与 studio 预览共用。表格:行=子项,列=选项,单元格单选。 */
+/** 矩阵量表作答态渲染。表格:行=子项,列=量级刻度,单元格单选;表头显示量级文案。 */
 import type { AnswerProps } from '../types.js';
 import { matrixWrapProps } from '../matrix-layout.js';
-import type { MatrixSingleProps, MatrixSingleAnswer } from './handler.js';
+import type { MatrixScaleProps, MatrixScaleAnswer } from './handler.js';
 
-export function MatrixSingleAnswerView({ question, value, onChange, disabled }: AnswerProps) {
-  const p = question.props as Partial<MatrixSingleProps>;
+export function MatrixScaleAnswerView({ question, value, onChange, disabled }: AnswerProps) {
+  const p = question.props as Partial<MatrixScaleProps>;
   const rows = p.rows ?? [];
   const options = p.options ?? [];
-  const ans: MatrixSingleAnswer =
-    value && typeof value === 'object' && !Array.isArray(value) ? (value as MatrixSingleAnswer) : {};
+  const ans: MatrixScaleAnswer =
+    value && typeof value === 'object' && !Array.isArray(value) ? (value as MatrixScaleAnswer) : {};
 
   const pick = (rowId: string, optValue: string) => {
     if (disabled) return;
@@ -18,13 +18,21 @@ export function MatrixSingleAnswerView({ question, value, onChange, disabled }: 
   const wrap = matrixWrapProps(question.props);
   return (
     <div className={wrap.className} style={wrap.style}>
-      <table className="matrix matrix-single">
+      <table className="matrix matrix-scale">
         <thead>
           <tr>
-            <th />
+            <th scope="col" className="mtx-scale-corner" />
             {options.map((opt) => (
               <th key={opt.value} scope="col">
-                {opt.label}
+                <span className="mtx-scale-lbl">{opt.label}</span>
+              </th>
+            ))}
+          </tr>
+          <tr className="mtx-scale-scores">
+            <th scope="col" className="mtx-scale-corner">分值</th>
+            {options.map((opt) => (
+              <th key={opt.value} scope="col">
+                <span className="mtx-scale-score">{typeof opt.score === 'number' ? opt.score : ''}</span>
               </th>
             ))}
           </tr>

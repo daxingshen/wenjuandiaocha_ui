@@ -64,6 +64,7 @@ export function Preview() {
                     {q.required && <span className="req">* </span>}
                     <span className="no">Q{i + 1}</span> {q.title}
                   </div>
+                  {q.hint && <div className="q-hint">{q.hint}</div>}
                   {Answer ? (
                     <Answer question={q} value={answers[q.id]} onChange={(v) => dispatch({ type: 'setAnswer', qid: q.id, value: v })} />
                   ) : (

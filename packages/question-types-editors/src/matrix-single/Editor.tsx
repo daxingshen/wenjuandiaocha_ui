@@ -1,56 +1,32 @@
-/** 矩阵单选编辑态:编子行(增删改)+ 列(增删改)。题干/必答/题型由 SettingsPanel 统一管。 */
-import type { EditorProps, MatrixSingleProps } from '@xingjuan/question-types';
-import '../editor.css';
+/**
+ * 矩阵单选编辑态。按 section 分段(右栏 题型 / 选项 两 tab):
+ * - section='type':矩阵单选无题型级配置(题干/提示/必答由 SettingsPanel 统一管)。
+ * - section='options':行(子项)增删改 + 列(选项)增删改。
+ * - section 缺省:全渲染(向后兼容)。与中栏 MatrixCanvasEditor 改同一份 props,双向同步。
+ */
+import type { EditorProps, MatrixSingleProps, MatrixLayout } from '@xingjuan/question-types';
+import { RowsEditor, ColsEditor, MatrixLayoutFields } from './shared.js';
 
-export function MatrixSingleEditor({ question, onChange }: EditorProps) {
-  const p = question.props as Partial<MatrixSingleProps>;
+export function MatrixSingleEditor({ question, onChange, section }: EditorProps) {
+  const p = question.props as Partial<MatrixSingleProps> & MatrixLayout;
   const rows = p.rows ?? [];
   const options = p.options ?? [];
-  const patch = (next: Partial<MatrixSingleProps>) => onChange({ props: { ...question.props, ...next } });
+  const patch = (next: Record<string, unknown>) => onChange({ props: { ...question.props, ...next } });
+
+  const showType = section === 'type' || section === undefined;
+  const showOptions = section === 'options' || section === undefined;
 
   return (
-    <div className="set-group">
-      <h5>子项(行)</h5>
-      {rows.map((row, i) => (
-        <div key={i} className="opt-row">
-          <input
-            type="text"
-            value={row.label}
-            onChange={(e) => patch({ rows: rows.map((r, j) => (j === i ? { ...r, label: e.target.value } : r)) })}
-          />
-          <button type="button" className="del" title="删除" onClick={() => patch({ rows: rows.filter((_, j) => j !== i) })}>
-            ✕
-          </button>
-        </div>
-      ))}
-      <button
-        type="button"
-        className="add-opt"
-        onClick={() => patch({ rows: [...rows, { id: `row${rows.length + 1}`, label: `子项${rows.length + 1}` }] })}
-      >
-        ＋ 添加子项
-      </button>
-
-      <h5>列(选项)</h5>
-      {options.map((opt, i) => (
-        <div key={i} className="opt-row">
-          <input
-            type="text"
-            value={opt.label}
-            onChange={(e) => patch({ options: options.map((o, j) => (j === i ? { ...o, label: e.target.value } : o)) })}
-          />
-          <button type="button" className="del" title="删除" onClick={() => patch({ options: options.filter((_, j) => j !== i) })}>
-            ✕
-          </button>
-        </div>
-      ))}
-      <button
-        type="button"
-        className="add-opt"
-        onClick={() => patch({ options: [...options, { value: `opt${options.length + 1}`, label: `选项${options.length + 1}` }] })}
-      >
-        ＋ 添加列
-      </button>
-    </div>
+    <>
+      {showType && (
+        <MatrixLayoutFields firstColWidth={p.firstColWidth} onChange={patch} />
+      )}
+      {showOptions && (
+        <>
+          <RowsEditor rows={rows} setRows={(r) => patch({ rows: r })} />
+          <ColsEditor options={options} setOptions={(o) => patch({ options: o })} />
+        </>
+      )}
+    </>
   );
 }

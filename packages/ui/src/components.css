@@ -144,8 +144,9 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .saved::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
 
 /* ============ 编辑器三栏 ============ */
-.editor { display: grid; grid-template-columns: 216px 1fr 288px; min-height: calc(100vh - 56px); }
-.ed-col { overflow-y: auto; }
+/* 定高(而非 min-height):三栏各自内部滚动,滚中间画布时两侧栏不跟随。 */
+.editor { display: grid; grid-template-columns: 216px 1fr 320px; height: calc(100vh - 56px); }
+.ed-col { overflow-y: auto; min-height: 0; }
 .ed-left { border-right: 1px solid var(--line); background: var(--surface); padding: 18px 14px; }
 .ed-left h4 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-muted); font-weight: 700; margin: 18px 2px 8px; }
 .ed-left h4:first-child { margin-top: 0; }
@@ -250,13 +251,83 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .ro-field { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); color: var(--ink-2); font-size: 14px; font-weight: 600; }
 .ro-field .lock { font-size: 12px; opacity: .6; cursor: default; }
 /* 右栏设置面板 tab 分区(题型/选项/逻辑)。sub-tabs 已定义于下方数据分析节,复用。 */
-.set-panel { margin-top: 4px; }
+/* 右栏设置面板:内容永不横向溢出(题型编辑器内部靠 flex 收缩适配),不出现横向滚动条 */
+.set-panel { margin-top: 4px; overflow-x: hidden; }
 .scale-row { display: flex; gap: 6px; }
 .scale-row .s { flex: 1; text-align: center; padding: 8px 0; border: 1px solid var(--line); border-radius: 7px; color: var(--ink-2); font-size: 12px; }
-.matrix { width: 100%; border-collapse: collapse; font-size: 13px; }
-.matrix th, .matrix td { padding: 8px; text-align: center; border-bottom: 1px solid var(--line-soft); color: var(--ink-2); }
+/* 矩阵表:首列固定宽(题目设置驱动),第二列起自适应均分铺满;列多时换行,不横向滚动(硬编码)。 */
+.matrix-wrap { max-width: 100%; overflow-x: hidden; }
+.matrix { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.matrix th, .matrix td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--line-soft); color: var(--ink-2); }
 .matrix th:first-child, .matrix td:first-child { text-align: left; }
+/* 首列宽由题目设置驱动(CSS 变量 --mtx-c1,默认 100px),所有矩阵题型通用。长文案换行,不撑破列宽。 */
+.matrix th:first-child, .matrix td:first-child { width: var(--mtx-c1, 100px); overflow-wrap: break-word; word-break: break-word; }
+/* 选择型矩阵(单选/多选/量表)数据列固定约四个汉字宽(~4.5em),超出则外层横向滚动。
+   填空/滑动条的第二列是输入框/滑轨,需占满剩余宽度,不套此规则。 */
+/* 选择型矩阵(单选/多选/量表):首列固定 150px,数据列(第二列起)auto 均分剩余宽、铺满整块。
+   table-layout:fixed + width:100% 下,多个 auto 列平分首列之外的剩余空间。 */
+.matrix-single thead th:not(:first-child), .matrix-single tbody td:not(:first-child),
+.matrix-multi thead th:not(:first-child), .matrix-multi tbody td:not(:first-child),
+.matrix-scale thead th:not(:first-child), .matrix-scale tbody td:not(:first-child) {
+  width: auto;
+}
 .matrix .mk { width: 15px; height: 15px; border: 1.5px solid var(--ink-muted); border-radius: 50%; display: inline-block; }
+/* 列头:列多且窄时自动换行,不用 nowrap(否则文字溢出重叠) */
+.matrix thead th { color: var(--ink-muted); font-weight: 600; font-size: 12px; white-space: normal; overflow-wrap: break-word; word-break: break-word; }
+.matrix input[type=radio], .matrix input[type=checkbox] { accent-color: var(--brand); width: 16px; height: 16px; }
+.matrix .cell-in { width: 100%; border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; font: inherit; font-size: 13px; background: var(--surface); color: var(--ink); }
+.matrix .cell-in:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-weak); }
+
+/* 题干下方填写提示(通用,所有题型) */
+.q-hint { font-size: 12.5px; color: var(--ink-muted); line-height: 1.5; margin: 4px 0 12px; }
+
+/* 矩阵量表:表头量级(文案) + 第二行分值 */
+.matrix-scale thead th { vertical-align: bottom; }
+.matrix-scale .mtx-scale-lbl { display: block; font-size: 10.5px; color: var(--ink-muted); }
+.matrix-scale .mtx-scale-scores th { padding-top: 2px; padding-bottom: 4px; }
+.mtx-scale-corner { font-size: 11px; font-weight: 600; color: var(--ink-muted); white-space: nowrap; }
+.matrix-scale .mtx-scale-score { display: inline-block; font-weight: 700; color: var(--brand); font-size: 12px; font-variant-numeric: tabular-nums; }
+/* 画布量表分值输入格(第二行) */
+.matrix-canvas-ed .score-cell { width: 100%; min-width: 0; text-align: center; font-weight: 600; color: var(--brand); }
+
+/* 矩阵填空:首列走统一 50px;标签过长省略,输入格占满剩余 */
+/* 矩阵填空:首列走统一 150px,第二列(输入框)自适应占满剩余 */
+.matrix-fill .mtx-fill-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; }
+.matrix-fill td:not(:first-child) { width: auto; }
+/* 画布内可编辑的填空提示文案(首行):虚线框示意「这是提示、可编辑」,与只读行区分 */
+.matrix-canvas-ed .fill-ph-edit { border-style: dashed; color: var(--ink-2); }
+.matrix-canvas-ed .fill-ph-edit:focus { border-style: solid; }
+
+/* 矩阵滑动条:行(子项)标签列走统一首列固定宽,文字过长省略 */
+.matrix-slider .mtx-slider-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 矩阵滑动条 + 单行滑块(作答态与画布占位共用) */
+.mtx-slider { display: flex; align-items: center; gap: 12px; }
+.mtx-slider .anchor { font-size: 11.5px; color: var(--ink-muted); flex: none; min-width: 28px; }
+.mtx-slider .anchor-max { text-align: right; }
+.mtx-slider input[type=range] { flex: 1; accent-color: var(--brand); }
+.mtx-slider input[type=range].unset { accent-color: var(--ink-muted); opacity: .55; }
+.mtx-slider .val { flex: none; min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; color: var(--brand); }
+.mtx-slider .val.unset { color: var(--ink-muted); font-weight: 400; }
+
+/* 矩阵画布内联编辑器(studio 中栏选中矩阵题):行/列标签可改 + ✕ 删 + ＋ 增 */
+.matrix-canvas-ed .lbl-cell { display: flex; align-items: center; gap: 4px; }
+.matrix-canvas-ed .lbl-in { flex: 1; min-width: 54px; border: 1px solid transparent; background: transparent; font: inherit; font-size: 12.5px; color: var(--ink-2); padding: 4px 6px; border-radius: 6px; }
+.matrix-canvas-ed .lbl-in:hover { border-color: var(--line); }
+.matrix-canvas-ed .lbl-in:focus { outline: none; border-color: var(--brand); background: var(--surface); color: var(--ink); box-shadow: 0 0 0 3px var(--brand-weak); }
+.matrix-canvas-ed .lbl-in.colhead { text-align: center; font-weight: 600; min-width: 0; padding: 4px 3px; }
+/* 画布数据列(选择型)auto 均分,与作答态一致铺满;列头 ✕ 仅悬停可见,省横向空间。 */
+/* fixed 布局下给 ＋列 列头一个宽度,避免被挤压 */
+.matrix-canvas-ed .addcol-cell { width: 56px; }
+.matrix-canvas-ed thead .lbl-cell { gap: 1px; }
+.matrix-canvas-ed .xbtn { width: 18px; height: 18px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--ink-muted); cursor: pointer; flex: none; font-size: 10px; line-height: 1; opacity: .5; transition: .15s; }
+.matrix-canvas-ed .xbtn:hover { border-color: var(--critical); color: var(--critical); opacity: 1; }
+.matrix-canvas-ed thead .xbtn { opacity: 0; }
+.matrix-canvas-ed thead th:hover .xbtn { opacity: .6; }
+.matrix-canvas-ed thead th:hover .xbtn:hover { opacity: 1; }
+/* 添加行/列按钮统一风格(蓝色虚线);表内 ＋列 与表外 ＋添加行 同款。 */
+.addcol { border: 1px dashed var(--line); background: var(--surface-2); color: var(--brand); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; border-radius: 7px; padding: 5px 10px; white-space: nowrap; }
+.addcol:hover { border-color: var(--brand); background: var(--brand-weak); }
 
 /* ============ 作答端(手机作答) ============ */
 .a-hero { background: var(--hero-grad); color: #fff; padding: 34px 24px 24px; position: relative; overflow: hidden; }

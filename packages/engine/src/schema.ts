@@ -23,6 +23,8 @@ export interface Question {
   type: string;
   /** 题干 */
   title: string;
+  /** 填写提示:题干下方的说明文字,作答者可见(通用字段,所有题型共用) */
+  hint?: string;
   /** 是否必答 */
   required?: boolean;
   /** 题型专属配置,核心层不解释其结构(约束 2) */
