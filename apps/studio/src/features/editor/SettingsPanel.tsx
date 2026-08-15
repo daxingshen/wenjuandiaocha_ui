@@ -14,7 +14,14 @@ import { LogicRules } from './LogicRules.js';
 type Tab = 'type' | 'options' | 'logic';
 
 /** 有「选项层」设置的题型(选项 tab 才渲染专属内容,否则给通用提示)。 */
-const HAS_OPTIONS_SECTION = new Set(['single-choice']);
+const HAS_OPTIONS_SECTION = new Set([
+  'single-choice',
+  'matrix-single',
+  'matrix-multi',
+  'matrix-scale',
+  'matrix-fill',
+  'matrix-slider',
+]);
 
 export function SettingsPanel() {
   const schema = useEditorStore((s) => s.schema);
@@ -57,6 +64,16 @@ export function SettingsPanel() {
           <div className="field">
             <label>题目标题</label>
             <input type="text" value={question.title} onChange={(e) => patch({ title: e.target.value })} />
+          </div>
+
+          <div className="field">
+            <label>填写提示</label>
+            <input
+              type="text"
+              placeholder="显示在题干下方,作答者可见(选填)"
+              value={question.hint ?? ''}
+              onChange={(e) => patch({ hint: e.target.value })}
+            />
           </div>
 
           <div className="toggle-row">

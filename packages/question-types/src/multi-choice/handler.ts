@@ -32,9 +32,9 @@ export const multiChoiceHandler: QuestionTypeHandler = {
   label: '多选',
   defaultProps: (): Record<string, unknown> => ({
     options: [
-      { value: 'opt1', label: '选项一' },
-      { value: 'opt2', label: '选项二' },
-      { value: 'opt3', label: '选项三' },
+      { value: 'opt1', label: '选项1' },
+      { value: 'opt2', label: '选项2' },
+      { value: 'opt3', label: '选项3' },
     ],
   }),
   validate: (question: Question, answer: unknown): string | null => {

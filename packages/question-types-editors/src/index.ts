@@ -8,6 +8,10 @@
  */
 import { registerSingleChoiceEditor } from './single-choice/index.js';
 import { registerMatrixSingleEditor } from './matrix-single/index.js';
+import { registerMatrixMultiEditor } from './matrix-multi/index.js';
+import { registerMatrixScaleEditor } from './matrix-scale/index.js';
+import { registerMatrixFillEditor } from './matrix-fill/index.js';
+import { registerMatrixSliderEditor } from './matrix-slider/index.js';
 import { registerMultiChoiceEditor } from './multi-choice/index.js';
 import { registerScaleEditor } from './scale/index.js';
 import { registerTextInputEditor } from './text-input/index.js';
@@ -16,6 +20,10 @@ import { registerTextareaEditor } from './textarea/index.js';
 export function registerAllEditors(): void {
   registerSingleChoiceEditor();
   registerMatrixSingleEditor();
+  registerMatrixMultiEditor();
+  registerMatrixScaleEditor();
+  registerMatrixFillEditor();
+  registerMatrixSliderEditor();
   registerMultiChoiceEditor();
   registerScaleEditor();
   registerTextInputEditor();

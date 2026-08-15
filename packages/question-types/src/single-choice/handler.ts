@@ -72,8 +72,10 @@ export const singleChoiceHandler: QuestionTypeHandler = {
   label: '单选',
   defaultProps: (): Record<string, unknown> => ({
     options: [
-      { value: 'opt1', label: '选项一' },
-      { value: 'opt2', label: '选项二' },
+      { value: 'opt1', label: '选项1' },
+      { value: 'opt2', label: '选项2' },
+      { value: 'opt3', label: '选项3' },
+      { value: 'opt4', label: '选项4' },
     ],
     arrange: 'vert',
   }),

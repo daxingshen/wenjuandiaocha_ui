@@ -23,6 +23,10 @@ const TYPE_ICON: Record<string, string> = {
   'text-input': '＿',
   textarea: '¶',
   'matrix-single': '▤',
+  'matrix-multi': '▦',
+  'matrix-scale': '▧',
+  'matrix-fill': '▤',
+  'matrix-slider': '⇔',
 };
 
 export function QuestionTypePanel() {

@@ -20,7 +20,7 @@
 /* ============ 题型设置子块(选项/行列编辑) ============ */
 .set-group h5 { font-size: 12px; font-weight: 600; color: var(--ink-2, #52514e); margin: 16px 0 8px; }
 .opt-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
-.opt-row input { flex: 1; padding: 8px 10px; border: 1px solid var(--line, #e1e0d9); border-radius: 8px; font: inherit; background: var(--surface-2, #fcfcfb); color: var(--ink, #0b0b0b); transition: border-color .15s, box-shadow .15s, background .15s; }
+.opt-row input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line, #e1e0d9); border-radius: 8px; font: inherit; background: var(--surface-2, #fcfcfb); color: var(--ink, #0b0b0b); transition: border-color .15s, box-shadow .15s, background .15s; }
 .opt-row input:focus { outline: none; border-color: var(--brand, #2a78d6); background: var(--surface, #fff); box-shadow: 0 0 0 3px var(--brand-weak, #eaf2fc); }
 .opt-row .del { width: 30px; height: 30px; border: 1px solid var(--line, #e1e0d9); border-radius: 8px; background: var(--surface-2, #fcfcfb); color: var(--ink-muted, #898781); flex: none; cursor: pointer; transition: .15s; }
 .opt-row .del:hover { border-color: var(--critical, #d03b3b); color: var(--critical, #d03b3b); }
@@ -28,6 +28,14 @@
 .add-opt { font-size: 13px; color: var(--brand, #2a78d6); font-weight: 600; padding: 4px 0; border: none; background: none; cursor: pointer; }
 .dual-field { display: flex; gap: 8px; }
 .dual-field .field { flex: 1; }
+.tri-field { display: flex; gap: 8px; }
+.tri-field .field { flex: 1; }
+/* 量表列设置:分值输入(窄),与列标签同行 */
+.opt-row .score-in { flex: none; width: 68px; }
+/* 矩阵填空:每行的独立提示文案输入(在行标题下方,缩进对齐) */
+.fill-row-ed { margin-bottom: 10px; }
+.fill-row-ed .fill-ph-field { width: 100%; border: 1px dashed var(--line, #e1e0d9); border-radius: 7px; padding: 6px 9px; font: inherit; font-size: 12px; color: var(--ink-2, #52514e); background: var(--surface-2, #fcfcfb); margin-top: 4px; }
+.fill-row-ed .fill-ph-field:focus { outline: none; border-style: solid; border-color: var(--brand, #2a78d6); background: var(--surface, #fff); }
 
 /* ============ 单选题编辑器:题型层 + 选项层设置(§ single-choice Editor) ============ */
 /* 小标题 / 分段标签 */
@@ -53,8 +61,9 @@
 .opt-flag { font-size: 10.5px; font-weight: 600; color: var(--brand, #2a78d6); background: var(--brand-weak, #eaf2fc); padding: 1px 7px; border-radius: 999px; flex: none; }
 
 /* 删除单个选项按钮(选项 tab 底部) */
-.obtn.del { font-size: 13px; color: var(--ink-muted, #898781); border: 1px solid var(--line, #e1e0d9); border-radius: 8px; background: var(--surface-2, #fcfcfb); padding: 6px 12px; cursor: pointer; }
-.obtn.del:hover { border-color: var(--critical, #d03b3b); color: var(--critical, #d03b3b); }
+/* 右栏「删除此选项」大按钮:限定 #opt-body,避免波及中栏画布内的紧凑图标删除按钮(.opt-ed .obtn)。 */
+#opt-body .obtn.del { font-size: 13px; color: var(--ink-muted, #898781); border: 1px solid var(--line, #e1e0d9); border-radius: 8px; background: var(--surface-2, #fcfcfb); padding: 6px 12px; cursor: pointer; }
+#opt-body .obtn.del:hover { border-color: var(--critical, #d03b3b); color: var(--critical, #d03b3b); }
 
 /* 折叠组(插入图片 / 样式设置):用原生 <details>,summary 即 fold-head。 */
 .fold { border-top: 1px solid var(--line-soft, rgba(11, 11, 11, 0.06)); margin-top: 12px; padding-top: 4px; }

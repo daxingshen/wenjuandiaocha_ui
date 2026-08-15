@@ -1,9 +1,9 @@
 /**
  * 矩阵单选的 engine 侧行为(非 UI):默认 props、校验、规范化。
- * 与 ./Answer.tsx ./Editor.tsx 一起构成完整的矩阵单选插件。
+ * 与 ./Answer.tsx 及 editors 包的 Editor.tsx 一起构成完整的矩阵单选插件。
  *
- * 「一题干、多子行、每行共用一组列(选项)」。它是题型模型的试金石:
- * 答案是 { 子行id: 选项value } 的对象,normalize 后每子行一行 { qid, subId, value }。
+ * 「一题干、多子行、每行共用一组列(选项)」。答案是 { 子行id: 选项value } 的对象,
+ * normalize 后每子行一行 { qid, subId, value }(按 props.rows 顺序,非答案遍历序)。
  */
 import type { QuestionTypeHandler, Question, NormalizedRow } from '@xingjuan/engine';
 
@@ -32,18 +32,25 @@ function readAnswer(answer: unknown): MatrixSingleAnswer {
   return answer as MatrixSingleAnswer;
 }
 
+/** 值非空串/非空即已答。 */
+function answered(v: unknown): boolean {
+  return v !== undefined && v !== null && v !== '';
+}
+
 export const matrixSingleHandler: QuestionTypeHandler = {
   type: 'matrix-single',
   group: 'matrix',
   label: '矩阵单选',
   defaultProps: (): Record<string, unknown> => ({
     rows: [
-      { id: 'row1', label: '子项一' },
-      { id: 'row2', label: '子项二' },
+      { id: 'row1', label: '子项1' },
+      { id: 'row2', label: '子项2' },
     ],
     options: [
-      { value: 'opt1', label: '选项一' },
-      { value: 'opt2', label: '选项二' },
+      { value: 'opt1', label: '选项1' },
+      { value: 'opt2', label: '选项2' },
+      { value: 'opt3', label: '选项3' },
+      { value: 'opt4', label: '选项4' },
     ],
   }),
   validate: (question: Question, answer: unknown): string | null => {
@@ -51,30 +58,27 @@ export const matrixSingleHandler: QuestionTypeHandler = {
     const ans = readAnswer(answer);
     const validValues = new Set(options.map((o) => o.value));
     for (const [subId, value] of Object.entries(ans)) {
-      if (value === '' || value === undefined || value === null) continue;
+      if (!answered(value)) continue;
       if (!rows.some((r) => r.id === subId)) return '存在不属于本题的子项';
       if (!validValues.has(value)) return '所选选项不存在';
     }
-    // 必答:每个子行都要有合法作答
-    if (question.required) {
-      const answered = (id: string) => ans[id] !== undefined && ans[id] !== null && ans[id] !== '';
-      if (!rows.every((r) => answered(r.id))) return '每个子项都需作答';
-    }
+    // 必答:每个子行都要有合法作答(空对象在通用层算已答,故必答判断落此处)。
+    if (question.required && !rows.every((r) => answered(ans[r.id]))) return '每个子项都需作答';
     return null;
   },
   normalize: (question: Question, answer: unknown): NormalizedRow[] => {
     const { rows } = readProps(question);
     const ans = readAnswer(answer);
-    // 每个已答子行产出一行 { qid, subId, value };交叉分析按 (qid, subId) 聚合。
+    // 按 props.rows 顺序,每个已答子行产出一行;交叉分析按 (qid, subId) 聚合。
     const out: NormalizedRow[] = [];
     for (const r of rows) {
       const v = ans[r.id];
-      if (v === undefined || v === null || v === '') continue;
+      if (typeof v !== 'string' || v === '') continue;
       out.push({ qid: question.id, subId: r.id, value: v });
     }
     return out;
   },
-  // 逻辑引用:子行 → subId 候选;列 → 条件值候选。这是 subId 契约在逻辑 UI 侧的出口。
+  // 逻辑引用:子行 → subId 候选;列 → 条件值候选。
   logicRef: (question: Question) => {
     const { rows, options } = readProps(question);
     return {

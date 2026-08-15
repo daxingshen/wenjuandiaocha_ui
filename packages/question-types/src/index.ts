@@ -10,6 +10,10 @@
  */
 import { registerSingleChoice } from './single-choice/index.js';
 import { registerMatrixSingle } from './matrix-single/index.js';
+import { registerMatrixMulti } from './matrix-multi/index.js';
+import { registerMatrixScale } from './matrix-scale/index.js';
+import { registerMatrixFill } from './matrix-fill/index.js';
+import { registerMatrixSlider } from './matrix-slider/index.js';
 import { registerMultiChoice } from './multi-choice/index.js';
 import { registerScale } from './scale/index.js';
 import { registerTextInput } from './text-input/index.js';
@@ -18,6 +22,10 @@ import { registerTextarea } from './textarea/index.js';
 export function registerAll(): void {
   registerSingleChoice();
   registerMatrixSingle();
+  registerMatrixMulti();
+  registerMatrixScale();
+  registerMatrixFill();
+  registerMatrixSlider();
   registerMultiChoice();
   registerScale();
   registerTextInput();
@@ -26,6 +34,8 @@ export function registerAll(): void {
 
 export { getAnswer, registerAnswer, getEditor, registerEditor } from './types.js';
 export type { AnswerProps, EditorProps } from './types.js';
+export { matrixWrapProps } from './matrix-layout.js';
+export type { MatrixLayout, MatrixWrapAttrs } from './matrix-layout.js';
 
 // 各题型 props 类型:供 editors 包(及其他消费者)标注编辑器,无需深入子路径。
 export type {
@@ -35,6 +45,10 @@ export type {
   SingleChoiceFillAnswer,
 } from './single-choice/index.js';
 export type { MatrixSingleProps, MatrixSingleAnswer } from './matrix-single/index.js';
+export type { MatrixMultiProps, MatrixMultiAnswer } from './matrix-multi/index.js';
+export type { MatrixScaleProps, MatrixScaleAnswer } from './matrix-scale/index.js';
+export type { MatrixFillProps, MatrixFillAnswer } from './matrix-fill/index.js';
+export type { MatrixSliderProps, MatrixSliderAnswer } from './matrix-slider/index.js';
 export type { MultiChoiceProps } from './multi-choice/index.js';
 export type { ScaleProps } from './scale/index.js';
 export type { TextInputProps, TextFormat } from './text-input/index.js';
