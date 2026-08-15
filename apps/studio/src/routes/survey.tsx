@@ -51,15 +51,12 @@ export function SurveyRoute() {
   // 编辑器根本不渲染。这一步就拦住了非法编辑;后端 40901 是最终防线。
   const [locked, setLocked] = useState(false);
 
+  // schema 载入:只按 :id 载一次,**不随 tab 重载**。编辑与预览共享编辑器 store 里这一份内存
+  // schema——切到预览看的就是正在编辑(含未保存)的内容,切回编辑也不丢。若随 tab 重载会用后端
+  // 旧版覆盖未保存编辑(曾经的缺陷)。
   // :id==='new' 是内存草稿态:不调后端(避免 404),直接载入空白草稿,首存时才落库。
-  // 其余按 :id 从后端载入草稿 schema 进编辑器 store。id 或 tab 变才重载。
-  //
-  // 编辑页额外守卫:直接在浏览器输入 /survey/:id/edit 会绕过看板的入口拦截。
-  // 载入时并行取状态,已发布(live/closed)则锁定、不渲染编辑器、弹告知窗。
-  // 预览/发布/分析页不锁(仅编辑受限)。后端 40901 仍是最终防线。
   useEffect(() => {
     if (!id) return;
-    setLocked(false);
     if (id === 'new') {
       load(emptyDraft());
       setLoadState('ready');
@@ -67,15 +64,9 @@ export function SurveyRoute() {
     }
     let alive = true;
     setLoadState('loading');
-    const needGuard = tab === 'edit';
-    Promise.all([getSurvey(id), needGuard ? getSurveyStats(id) : Promise.resolve(null)])
-      .then(([s, stats]) => {
+    getSurvey(id)
+      .then((s) => {
         if (!alive) return;
-        if (stats && !canEditSurvey(stats.status)) {
-          setLocked(true);
-          setLoadState('ready');
-          return; // 不 load 进编辑器 store,不渲染编辑器
-        }
         load(s);
         setLoadState('ready');
       })
@@ -83,7 +74,26 @@ export function SurveyRoute() {
     return () => {
       alive = false;
     };
-  }, [id, tab, load]);
+  }, [id, load]);
+
+  // 编辑页发布锁守卫:直接在浏览器输入 /survey/:id/edit 会绕过看板的入口拦截。进编辑 tab 时取状态,
+  // 已发布(live/closed)则锁定、不渲染编辑器、弹告知窗。**必须随 tab 重跑**:预览→返回编辑也要重新校验。
+  // 预览/发布/分析页不锁(仅编辑受限);new 草稿不校验。后端 40901 仍是最终防线。
+  useEffect(() => {
+    setLocked(false);
+    if (!id || id === 'new' || tab !== 'edit') return;
+    let alive = true;
+    getSurveyStats(id)
+      .then((stats) => {
+        if (alive && !canEditSurvey(stats.status)) setLocked(true);
+      })
+      .catch(() => {
+        // 守卫取状态失败不阻断编辑(schema 载入有独立错误态);后端 40901 兜底。
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id, tab]);
 
   // 未知 tab(如 /survey/:id/publsh 拼错):不静默回退,统一走默认 404 页,让错误可见。
   const isTab = (t: string | undefined): t is TabKey => TABS.some((x) => x.key === t);
