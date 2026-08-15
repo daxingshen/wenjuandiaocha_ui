@@ -31,9 +31,35 @@ export interface SurveyStats {
 
 import { apiGet, apiSend } from './client.js';
 
-/** 列出当前用户的问卷。 */
-export async function listSurveys(): Promise<SurveyListItem[]> {
-  return apiGet<SurveyListItem[]>('/surveys');
+/** offset 翻页一页结果。total 为筛选后总行数,前端据此算总页数。 */
+export interface SurveyListPage {
+  items: SurveyListItem[];
+  total: number;
+}
+
+/** 列表查询参数(全部可选)。q 非空即搜索态:后端忽略 page/limit,只返回前 10 条。 */
+export interface ListSurveysParams {
+  q?: string;
+  status?: string;
+  type?: string;
+  limit?: number;
+  page?: number;
+}
+
+/**
+ * 列出当前用户的问卷(offset 分页)。后端 GET /api/surveys?q=&status=&type=&limit=&page=。
+ * 空参数即第一页全量;翻页传 page(1-based)。
+ */
+export async function listSurveys(params: ListSurveysParams = {}): Promise<SurveyListPage> {
+  const sp = new URLSearchParams();
+  const q = params.q?.trim();
+  if (q) sp.set('q', q);
+  if (params.status) sp.set('status', params.status);
+  if (params.type) sp.set('type', params.type);
+  if (params.limit) sp.set('limit', String(params.limit));
+  if (params.page && params.page > 1) sp.set('page', String(params.page));
+  const qs = sp.toString();
+  return apiGet<SurveyListPage>(`/surveys${qs ? `?${qs}` : ''}`);
 }
 
 /**

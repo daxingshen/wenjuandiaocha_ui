@@ -2,9 +2,8 @@
  * 问卷看板:应用外壳(顶栏 + 左侧导航 + 主视图),对齐原型。
  * 类型只是筛选维度,非独立系统(UI 文档 §3.2「一套引擎」)。后端未接:列表用示例数据。
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../auth/useAuthStore.js';
 import { TopBar } from '../../components/TopBar.js';
 import { ConfirmDialog } from '../../components/ConfirmDialog.js';
 import { listSurveys, type SurveyListItem } from '../../api/surveys.js';
@@ -42,35 +41,151 @@ function relTime(iso: string): string {
 
 const FILTERS = [
   { key: 'all', label: '全部' },
-  { key: 'survey', label: '问卷' },
-  { key: 'exam', label: '考试' },
-  { key: 'vote', label: '投票' },
-  { key: 'form', label: '报名' },
   { key: 'live', label: '进行中' },
   { key: 'draft', label: '待发布' },
   { key: 'closed', label: '已结束' },
 ];
 
+const PAGE_SIZES = [10, 20, 50];
+
+/**
+ * 页码窗口:总页数大时只显示首尾 + 当前页附近,其余用省略号('…')占位。
+ * 例:page=6 total=20 → [1, '…', 5, 6, 7, '…', 20]。
+ */
+function pageWindow(page: number, totalPages: number): (number | '…')[] {
+  const span = 1; // 当前页左右各显示 1 个
+  const set = new Set<number>([1, totalPages]);
+  for (let p = page - span; p <= page + span; p++) {
+    if (p >= 1 && p <= totalPages) set.add(p);
+  }
+  const sorted = [...set].sort((a, b) => a - b);
+  const out: (number | '…')[] = [];
+  let prev = 0;
+  for (const p of sorted) {
+    if (prev && p - prev > 1) out.push('…');
+    out.push(p);
+    prev = p;
+  }
+  return out;
+}
+
+/** 右下角页码器:上一页 / 页码(带省略号)/ 下一页。 */
+function Pager({ page, totalPages, onPage }: { page: number; totalPages: number; onPage: (p: number) => void }) {
+  return (
+    <nav className="pager" aria-label="分页">
+      <button className="pg-btn" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="上一页">
+        ‹
+      </button>
+      {pageWindow(page, totalPages).map((p, i) =>
+        p === '…' ? (
+          <span key={`gap-${i}`} className="pg-gap">
+            …
+          </span>
+        ) : (
+          <button
+            key={p}
+            className={`pg-btn${p === page ? ' on' : ''}`}
+            aria-current={p === page ? 'page' : undefined}
+            onClick={() => onPage(p)}
+          >
+            {p}
+          </button>
+        ),
+      )}
+      <button className="pg-btn" disabled={page >= totalPages} onClick={() => onPage(page + 1)} aria-label="下一页">
+        ›
+      </button>
+    </nav>
+  );
+}
+
 export function Dashboard() {
   const navigate = useNavigate();
-  const user = useAuthStore((s) => s.user);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('all'); // 状态 chip:all|live|draft|closed → 后端 status 参数
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1); // 当前页码(1-based)
+  const [total, setTotal] = useState(0); // 筛选后总行数(算总页数)
+  const [query, setQuery] = useState(''); // 输入框实时值
+  const [activeQuery, setActiveQuery] = useState(''); // 已提交(回车)生效的搜索词
   const [surveys, setSurveys] = useState<SurveyListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // 已发布问卷被拦下的编辑尝试:持有被拦问卷,非空即弹拦截窗。null = 无拦截。
   const [blocked, setBlocked] = useState<SurveyListItem | null>(null);
 
+  // 搜索态:有生效搜索词时后端只返回前 10 条、不翻页,前端隐藏页码器。
+  const searching = activeQuery !== '';
+
+  // 统一拉列表。筛选/搜索/翻页都走后端;显式传参避免闭包读到旧 state。
+  const fetchList = useCallback(
+    async (opts: { q: string; status: string; size: number; page: number }) => {
+      setLoading(true);
+      try {
+        const res = await listSurveys({
+          q: opts.q || undefined,
+          status: opts.status === 'all' ? undefined : opts.status,
+          limit: opts.size,
+          page: opts.page,
+        });
+        setSurveys(res.items);
+        setTotal(res.total);
+        setError('');
+      } catch {
+        setSurveys([]);
+        setTotal(0);
+        setError('加载问卷失败');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
+  // 首屏:第一页全量。
   useEffect(() => {
-    let alive = true;
-    listSurveys()
-      .then((rows) => alive && (setSurveys(rows), setError('')))
-      .catch(() => alive && setError('加载问卷失败'))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
-  }, []);
+    void fetchList({ q: '', status: 'all', size: 10, page: 1 });
+  }, [fetchList]);
+
+  // 换状态 chip:后端按 status 过滤,回到第一页。
+  const onFilter = (key: string) => {
+    setFilter(key);
+    setPage(1);
+    void fetchList({ q: activeQuery, status: key, size: pageSize, page: 1 });
+  };
+
+  // 换页大小:回到第一页重拉。
+  const onPageSize = (size: number) => {
+    setPageSize(size);
+    setPage(1);
+    void fetchList({ q: activeQuery, status: filter, size, page: 1 });
+  };
+
+  // 回车触发接口搜索(输入过程中不请求)。搜索态后端只返回前 10 条、不翻页,回到第一页。
+  const onSearch = () => {
+    const kw = query.trim();
+    setActiveQuery(kw);
+    setPage(1);
+    void fetchList({ q: kw, status: filter, size: pageSize, page: 1 });
+  };
+
+  // 清空搜索框。若当前有生效搜索词,退出搜索态并重拉全量(回第一页);仅清输入则不请求。
+  const onClear = () => {
+    setQuery('');
+    if (activeQuery !== '') {
+      setActiveQuery('');
+      setPage(1);
+      void fetchList({ q: '', status: filter, size: pageSize, page: 1 });
+    }
+  };
+
+  // 跳到指定页码(页码器点击)。搜索态不翻页。
+  const onPage = (p: number) => {
+    if (p === page || p < 1) return;
+    setPage(p);
+    void fetchList({ q: activeQuery, status: filter, size: pageSize, page: p });
+  };
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   // 新建:不再先落库,进内存草稿态编辑器(/survey/new),用户点保存才首存落库(零写入直到保存)。
   const onCreate = () => navigate('/survey/new/edit');
@@ -82,83 +197,50 @@ export function Dashboard() {
     else setBlocked(s);
   };
 
-  const list = surveys.filter((s) => {
-    if (filter === 'all') return true;
-    if (filter === 'live' || filter === 'draft' || filter === 'closed') return s.status === filter;
-    return s.type === filter;
-  });
+  // 筛选/搜索/翻页全在后端做,前端直接渲染返回结果。
+  const list = surveys;
 
   return (
     <div>
       <TopBar />
 
       <div className="app-body">
-        {/* 左侧全局导航 */}
+        {/* 左侧全局导航:只保留「问卷」单项(承担「看全部问卷」的定位)。 */}
         <aside className="app-side">
-          <div className="side-item on">
+          <div className={`side-item${filter === 'all' ? ' on' : ''}`} onClick={() => onFilter('all')}>
             <span className="si">🗂</span>
-            <span>全部问卷</span>
+            <span>问卷</span>
           </div>
-          <div className="side-item">
-            <span className="si">🏠</span>
-            <span>工作台</span>
-          </div>
-          <div className="side-cap">按类型</div>
-          {Object.entries(TYPE_META).map(([key, m]) => (
-            <div key={key} className="side-item" onClick={() => setFilter(key)}>
-              <span className="si">{m.ic}</span>
-              <span>{m.label}</span>
-            </div>
-          ))}
         </aside>
 
         {/* 右侧主视图 */}
         <main className="app-main">
-          <div className="main-head">
-            <div>
-              <h1>所有问卷</h1>
-              <p>管理你的问卷、考试、投票与测评 · {user?.name} · {user?.level}</p>
-            </div>
-          </div>
-
-          {/* KPI 行 */}
-          <div className="stat-row">
-            <div className="card stat-tile">
-              <div className="k">问卷总数</div>
-              <div className="v">6</div>
-              <div className="d up">▲ 本周 +2</div>
-            </div>
-            <div className="card stat-tile">
-              <div className="k">累计回收</div>
-              <div className="v">12,840 <small>份</small></div>
-              <div className="d up">▲ 8.3%</div>
-            </div>
-            <div className="card stat-tile">
-              <div className="k">今日新增</div>
-              <div className="v">327 <small>份</small></div>
-              <div className="d up">▲ 较昨日</div>
-            </div>
-            <div className="card stat-tile">
-              <div className="k">平均完成率</div>
-              <div className="v">86.4<small>%</small></div>
-              <div className="d">持平</div>
-            </div>
-          </div>
-
           {/* 筛选工具条 */}
           <div className="board-bar">
             {FILTERS.map((f) => (
-              <button key={f.key} className={`fchip${filter === f.key ? ' on' : ''}`} onClick={() => setFilter(f.key)}>
+              <button key={f.key} className={`fchip${filter === f.key ? ' on' : ''}`} onClick={() => onFilter(f.key)}>
                 {f.label}
               </button>
             ))}
             <div className="grow" />
-            <select defaultValue="updated">
-              <option value="updated">按更新时间</option>
-              <option value="recv">按回收量</option>
-              <option value="created">按创建时间</option>
-            </select>
-            <input className="search2" placeholder="🔍 搜索问卷…" />
+            <div className="search-wrap">
+              <span className="search-ic" aria-hidden="true">🔍</span>
+              <input
+                className="search2"
+                placeholder="搜索问卷标题,回车搜索…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') onSearch();
+                  else if (e.key === 'Escape') onClear();
+                }}
+              />
+              {query && (
+                <button className="search-clear" onClick={onClear} title="清空" aria-label="清空搜索">
+                  ✕
+                </button>
+              )}
+            </div>
             <button className="btn primary" onClick={onCreate}>
               ＋ 新建问卷
             </button>
@@ -169,9 +251,13 @@ export function Dashboard() {
             {loading && <p style={{ color: 'var(--ink-muted)', padding: 16 }}>加载中…</p>}
             {error && !loading && <p style={{ color: 'var(--critical)', padding: 16 }}>{error}</p>}
             {!loading && !error && list.length === 0 && (
-              <p style={{ color: 'var(--ink-muted)', padding: 16 }}>还没有问卷,点右上「新建问卷」开始。</p>
+              <p style={{ color: 'var(--ink-muted)', padding: 16 }}>
+                {activeQuery || filter !== 'all'
+                  ? '没有匹配的问卷,试试换个搜索词或筛选条件。'
+                  : '还没有问卷,点右上「新建问卷」开始。'}
+              </p>
             )}
-            {list.map((s) => {
+            {!loading && !error && list.map((s) => {
               const m = TYPE_META[s.type] ?? { color: 'var(--s1)', ic: '问', label: s.type };
               const st = STATUS_META[s.status] ?? { cls: 'draft', label: s.status };
               return (
@@ -203,7 +289,29 @@ export function Dashboard() {
                 </div>
               );
             })}
+
           </div>
+
+          {/* 右下角页码器:非搜索态且总页数>1 时显示。点击页码跳页。 */}
+          {/* 右下角分页区:每页条数选择器 + 页码器(均非搜索态显示;页码器仅在多于一页时出现)。 */}
+          {!loading && !error && !searching && list.length > 0 && (
+            <div className="pager-bar">
+              <select
+                className="page-size"
+                value={pageSize}
+                onChange={(e) => onPageSize(Number(e.target.value))}
+                title="每页条数"
+                aria-label="每页条数"
+              >
+                {PAGE_SIZES.map((n) => (
+                  <option key={n} value={n}>
+                    每页 {n}
+                  </option>
+                ))}
+              </select>
+              {totalPages > 1 && <Pager page={page} totalPages={totalPages} onPage={onPage} />}
+            </div>
+          )}
         </main>
       </div>
 
