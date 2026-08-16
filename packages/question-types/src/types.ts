@@ -54,15 +54,60 @@ export function getAnswer(type: string): ComponentType<AnswerProps> | undefined 
   return answerRegistry.get(type);
 }
 
-// ============ 编辑组件注册表(仅 studio 会填) ============
-const editorRegistry = new Map<string, ComponentType<EditorProps>>();
-
-/** 登记题型的编辑组件。由 editors 包调用;runtime 不调用,故该表在 runtime 侧恒空。 */
-export function registerEditor(type: string, Editor: ComponentType<EditorProps>): void {
-  editorRegistry.set(type, Editor);
+/**
+ * 中栏画布内联编辑组件 props(studio 编辑器画布用)。
+ * 与 EditorProps 同形但只取无损映射所需字段:题型据此改题(选项/矩阵/文本内联编辑),
+ * 由宿主(studio)把 store 动作翻译成 onChange/onSelectOption 注入——组件不感知宿主状态实现。
+ * 决策 §16/§18 的「画布内联编辑」从 app 硬编码上移为题型自带,契约在此低层包保持宿主中立。
+ */
+export interface CanvasEditorProps {
+  question: Question;
+  onChange: (patch: Partial<Question>) => void;
+  /** 当前选中选项下标(选择题画布↔右栏联动);宿主未提供选项通道时缺省。 */
+  selectedOptIndex?: number | null;
+  /** 请求宿主切换选中选项;宿主未提供选项通道时可缺省。 */
+  onSelectOption?: (index: number | null) => void;
 }
 
-/** 取题型编辑组件;未注册(如 runtime,或该题型无编辑器)返回 undefined。 */
-export function getEditor(type: string): ComponentType<EditorProps> | undefined {
+// ============ 编辑组件注册表(仅 studio 会填) ============
+/**
+ * 题型编辑描述符(方案 A:单对象承载右栏 + 画布 + tab 构成的全部编辑元数据)。
+ * 一个题型 = 一次 registerEditor 囊括:右栏设置组件 + 画布内联编辑组件 + 有哪些中间 tab + 画布题干徽标。
+ * studio 外壳据此装配,零题型知识;新增题型只在自己目录声明,engine/apps 全不改。
+ */
+export interface EditorRegistration {
+  /** 右栏设置面板组件(按 section 分段渲染)。 */
+  Editor: ComponentType<EditorProps>;
+  /** 中栏画布内联编辑组件;缺省则该题型选中时画布走只读 Answer 预览(如 scale)。 */
+  canvasEditor?: ComponentType<CanvasEditorProps>;
+  /**
+   * 右栏「中间 tab」构成(type 与 logic 由外壳恒定提供,不在此列):
+   * 选择/矩阵题 = ['options'];填空/简答/多项填空 = ['input'];scale 等 = [](无中间 tab)。
+   * 取代 studio 旧硬编码 TEXT_TABS / HAS_OPTIONS_SECTION;不能从 Editor 内部 section 分支静态反射,故显式声明。
+   */
+  sections: Array<'options' | 'input'>;
+  /** 画布题干徽标(整题级,如填空的格式标记);缺省不标。每框级徽标(多项填空)留画布组件内部渲染,不在此列。 */
+  canvasBadge?: (question: Question) => string | null;
+}
+
+const editorRegistry = new Map<string, EditorRegistration>();
+
+/** 登记题型的编辑描述符。由 editors 包调用;runtime 不调用,故该表在 runtime 侧恒空。 */
+export function registerEditor(type: string, reg: EditorRegistration): void {
+  editorRegistry.set(type, reg);
+}
+
+/** 取题型编辑描述符;未注册(如 runtime,或该题型无编辑器)返回 undefined。 */
+export function getEditor(type: string): EditorRegistration | undefined {
   return editorRegistry.get(type);
+}
+
+/** 便捷取右栏设置组件(向后兼容旧 getEditor(type) 只要组件的调用点)。 */
+export function getEditorComponent(type: string): ComponentType<EditorProps> | undefined {
+  return editorRegistry.get(type)?.Editor;
+}
+
+/** 便捷取画布内联编辑组件;无则 undefined(画布回落只读 Answer)。 */
+export function getCanvasEditor(type: string): ComponentType<CanvasEditorProps> | undefined {
+  return editorRegistry.get(type)?.canvasEditor;
 }

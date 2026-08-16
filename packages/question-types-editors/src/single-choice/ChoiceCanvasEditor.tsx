@@ -1,19 +1,26 @@
 /**
- * 中栏画布内选中「选择题」的编辑态选项列表(studio 专属,决策2-A):
+ * 中栏画布内选中「选择题」的编辑态选项列表(studio 专属,决策 §16/§18):
  * 选项可内联改文字、点选高亮(与右栏选项 tab 双向同步)、✕ 删除、拖拽把手原生 DnD 重排。
  * 单选(radio 记号)与多选(checkbox 记号)共用本组件,靠 mode 区分记号形态——选项结构同源。
  * 不走作答端 Answer 组件(那是只读预览);作答端契约 AnswerProps 因此保持零负担。
- * 用原型 .opt-list/.opt-row/.opt-ed/.oin/.drag/.obtn 类(样式见 components.css)。
+ *
+ * 本组件从 studio app 上移进 editors 包(§20):对宿主的依赖从直连 useEditorStore
+ * 收敛为标准 CanvasEditorProps(onChange/selectedOptIndex/onSelectOption),题型自带画布编辑。
+ * single-choice/multi-choice 各在自己 index.ts 内包装绑定 mode 后登记,组件对外只吃标准 props。
+ * 用 .opt-list/.opt-row/.opt-ed/.oin/.drag/.obtn 类(样式见 @xingjuan/ui components.css + editor.css 的 add-opt)。
  */
 import { useState } from 'react';
-import type { Question } from '@xingjuan/engine';
+import type { CanvasEditorProps } from '@xingjuan/question-types';
 import type { SingleChoiceOption, SingleChoiceProps } from '@xingjuan/question-types';
-import { useEditorStore } from './useEditorStore.js';
+import '../editor.css';
 
-export function ChoiceCanvasEditor({ question, mode }: { question: Question; mode: 'single' | 'multi' }) {
-  const updateQuestion = useEditorStore((s) => s.updateQuestion);
-  const selectedOptIndex = useEditorStore((s) => s.selectedOptIndex);
-  const selectOption = useEditorStore((s) => s.selectOption);
+export function ChoiceCanvasEditor({
+  question,
+  onChange,
+  selectedOptIndex,
+  onSelectOption,
+  mode,
+}: CanvasEditorProps & { mode: 'single' | 'multi' }) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   const p = question.props as Partial<SingleChoiceProps>;
@@ -21,7 +28,7 @@ export function ChoiceCanvasEditor({ question, mode }: { question: Question; mod
   const arrange = p.arrange ?? 'vert';
 
   const setOptions = (opts: SingleChoiceOption[]) =>
-    updateQuestion(question.id, { props: { ...question.props, options: opts } });
+    onChange({ props: { ...question.props, options: opts } });
 
   const setLabel = (i: number, label: string) =>
     setOptions(options.map((o, j) => (j === i ? { ...o, label } : o)));
@@ -29,15 +36,15 @@ export function ChoiceCanvasEditor({ question, mode }: { question: Question; mod
   const del = (i: number) => {
     if (options.length <= 1) return; // 保底至少一项
     setOptions(options.filter((_, j) => j !== i));
-    if (selectedOptIndex !== null && selectedOptIndex >= options.length - 1) {
-      selectOption(options.length - 2);
+    if (selectedOptIndex != null && selectedOptIndex >= options.length - 1) {
+      onSelectOption?.(options.length - 2);
     }
   };
 
   const addOption = () => {
     const next = [...options, { value: `opt${options.length + 1}`, label: `选项${options.length + 1}` }];
     setOptions(next);
-    selectOption(next.length - 1);
+    onSelectOption?.(next.length - 1);
   };
 
   // 原生 HTML5 拖拽:把 dragIndex 的项落到 dropIndex 前。
@@ -47,7 +54,7 @@ export function ChoiceCanvasEditor({ question, mode }: { question: Question; mod
     const [moved] = next.splice(dragIndex, 1);
     next.splice(dropIndex, 0, moved!);
     setOptions(next);
-    selectOption(dropIndex);
+    onSelectOption?.(dropIndex);
     setDragIndex(null);
   };
 
@@ -58,7 +65,7 @@ export function ChoiceCanvasEditor({ question, mode }: { question: Question; mod
           <div
             key={i}
             className={`opt-row${selectedOptIndex === i ? ' sel' : ''}${opt.style?.hidden ? ' opt-hidden' : ''}`}
-            onClick={() => selectOption(i)}
+            onClick={() => onSelectOption?.(i)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => onDrop(i)}
           >
@@ -85,10 +92,10 @@ export function ChoiceCanvasEditor({ question, mode }: { question: Question; mod
                   fontWeight: opt.style?.bold ? 700 : undefined,
                 }}
                 // 点/聚焦文本框也选中该项(切右栏「选项」tab);stopPropagation 防冒泡到题选中。
-                onFocus={() => selectOption(i)}
+                onFocus={() => onSelectOption?.(i)}
                 onClick={(e) => {
                   e.stopPropagation();
-                  selectOption(i);
+                  onSelectOption?.(i);
                 }}
                 onChange={(e) => setLabel(i, e.target.value)}
               />
@@ -136,4 +143,14 @@ export function ChoiceCanvasEditor({ question, mode }: { question: Question; mod
       <div className="add-opt" onClick={addOption}>＋ 添加选项</div>
     </>
   );
+}
+
+/** 单选画布:绑定 mode='single'(圆点记号),对外只吃标准 CanvasEditorProps。 */
+export function SingleChoiceCanvas(props: CanvasEditorProps) {
+  return <ChoiceCanvasEditor {...props} mode="single" />;
+}
+
+/** 多选画布:绑定 mode='multi'(方块记号)。 */
+export function MultiChoiceCanvas(props: CanvasEditorProps) {
+  return <ChoiceCanvasEditor {...props} mode="multi" />;
 }

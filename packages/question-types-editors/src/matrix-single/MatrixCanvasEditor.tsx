@@ -1,15 +1,17 @@
 /**
  * 中栏画布内选中矩阵题的「编辑态」表格(studio 专属,决策6):
  * 行标签 / 列标签可内联改字、✕ 删行删列、＋ 增行增列;作答控件渲染为 disabled 占位(仅示意)。
- * 改的是 question.props.rows / .options,经 useEditorStore.updateQuestion patch,与右栏「选项」tab 双向同步。
+ * 改的是 question.props.rows / .options,经 CanvasEditorProps.onChange patch,与右栏「选项」tab 双向同步。
  * 不走作答端 Answer(那是只读预览);作答端契约 AnswerProps 因此零负担。
  *
- * 五题型:matrix-single/matrix-multi/matrix-scale 有列;matrix-fill/matrix-slider 无列。
+ * 五题型 matrix-single/multi/scale/fill/slider 共用本组件(§20 上移进 editors 包,由 5 个
+ * 矩阵目录 registerEditor 时各自 import 指向它);对宿主依赖从 useEditorStore 收敛为标准 CanvasEditorProps。
+ * matrix-single/matrix-multi/matrix-scale 有列;matrix-fill/matrix-slider 无列。
+ * 全部类在 @xingjuan/ui components.css(与作答共享),不引 editor.css。
  */
 import { useEffect, useState } from 'react';
-import type { Question } from '@xingjuan/engine';
+import type { CanvasEditorProps } from '@xingjuan/question-types';
 import { matrixWrapProps } from '@xingjuan/question-types';
-import { useEditorStore } from './useEditorStore.js';
 
 /**
  * 分值输入:受控 number 直接 Number() 会把「2.」吞成 2,无法输入小数。
@@ -55,8 +57,7 @@ interface Col {
 /** 哪些矩阵题型有列。 */
 const HAS_COLUMNS = new Set(['matrix-single', 'matrix-multi', 'matrix-scale']);
 
-export function MatrixCanvasEditor({ question }: { question: Question }) {
-  const updateQuestion = useEditorStore((s) => s.updateQuestion);
+export function MatrixCanvasEditor({ question, onChange }: CanvasEditorProps) {
   const p = question.props as {
     rows?: Row[];
     options?: Col[];
@@ -73,7 +74,7 @@ export function MatrixCanvasEditor({ question }: { question: Question }) {
   const wrap = matrixWrapProps(question.props);
 
   const patch = (next: Record<string, unknown>) =>
-    updateQuestion(question.id, { props: { ...question.props, ...next } });
+    onChange({ props: { ...question.props, ...next } });
 
   const setRowLabel = (i: number, label: string) =>
     patch({ rows: rows.map((r, j) => (j === i ? { ...r, label } : r)) });

@@ -3,19 +3,20 @@
  * 比原生 <select> 只露选中项直观。支持画布内联:改选项文字、✕ 删、＋ 增,与右栏「选项」tab
  * 双向同步(改同一份 question.props)。默认选中项高亮标记;设默认仍在右栏。
  * 不走作答端 Answer 组件(那是真·下拉);作答端契约保持零负担。
+ *
+ * §20 上移进 editors 包:对宿主依赖从 useEditorStore 收敛为标准 CanvasEditorProps.onChange。
+ * 全部类在 @xingjuan/ui components.css。
  */
-import type { Question } from '@xingjuan/engine';
+import type { CanvasEditorProps } from '@xingjuan/question-types';
 import type { DropdownOption, DropdownProps } from '@xingjuan/question-types';
-import { useEditorStore } from './useEditorStore.js';
 
-export function DropdownCanvasPreview({ question }: { question: Question }) {
-  const updateQuestion = useEditorStore((s) => s.updateQuestion);
+export function DropdownCanvasPreview({ question, onChange }: CanvasEditorProps) {
   const p = question.props as Partial<DropdownProps>;
   const options = (p.options ?? []) as DropdownOption[];
   const defaultValue = p.defaultValue;
 
   const patch = (next: Partial<DropdownProps>) =>
-    updateQuestion(question.id, { props: { ...question.props, ...next } });
+    onChange({ props: { ...question.props, ...next } });
   const setOptions = (opts: DropdownOption[]) => patch({ options: opts });
 
   const setLabel = (i: number, label: string) =>

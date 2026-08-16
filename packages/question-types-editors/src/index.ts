@@ -33,3 +33,8 @@ export function registerAllEditors(): void {
   registerTextInputEditor();
   registerTextareaEditor();
 }
+
+// 右栏设置面板外壳 + 公共字段(§20 题型自包含:宿主注入单题 props + logicSlot,外壳零题型知识)。
+export { SettingsPanelShell } from './shared/SettingsPanelShell.js';
+export type { SettingsPanelShellProps } from './shared/SettingsPanelShell.js';
+export { CommonFields } from './shared/CommonFields.js';
