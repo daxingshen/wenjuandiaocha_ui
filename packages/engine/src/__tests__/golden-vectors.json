@@ -97,6 +97,14 @@
       ],
       "answers": { "q1": { "value": "work", "text": "" } },
       "expectHidden": []
+    },
+    {
+      "name": "多选带填空:混合数组含对象元素 {value,text},includes 按 value 命中 → 隐藏",
+      "rules": [
+        { "id": "r1", "conditions": [{ "qid": "q1", "op": "includes", "value": "other" }], "combinator": "AND", "action": { "type": "hide", "target": "q2" } }
+      ],
+      "answers": { "q1": ["a", { "value": "other", "text": "具体渠道" }] },
+      "expectHidden": ["q2"]
     }
   ]
 }

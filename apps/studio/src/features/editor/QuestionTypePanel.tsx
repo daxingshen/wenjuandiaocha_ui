@@ -19,6 +19,7 @@ const GROUP_LABEL: Record<string, string> = {
 const TYPE_ICON: Record<string, string> = {
   'single-choice': '◉',
   'multi-choice': '☑',
+  dropdown: '▾',
   scale: '⇢',
   'text-input': '＿',
   textarea: '¶',

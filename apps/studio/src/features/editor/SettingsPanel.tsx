@@ -5,7 +5,7 @@
  * - 逻辑 tab:复用现成 <LogicRules>。
  * 题型专属配置委托 getUI(type).Editor 渲染——各题型只管自己的 props(约束 2)。
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getHandler } from '@xingjuan/engine';
 import { getEditor } from '@xingjuan/question-types';
 import { useEditorStore } from './useEditorStore.js';
@@ -16,6 +16,8 @@ type Tab = 'type' | 'options' | 'logic';
 /** 有「选项层」设置的题型(选项 tab 才渲染专属内容,否则给通用提示)。 */
 const HAS_OPTIONS_SECTION = new Set([
   'single-choice',
+  'multi-choice',
+  'dropdown',
   'matrix-single',
   'matrix-multi',
   'matrix-scale',
@@ -31,6 +33,12 @@ export function SettingsPanel() {
   const selectOption = useEditorStore((s) => s.selectOption);
   const [tab, setTab] = useState<Tab>('type');
 
+  // 画布点选某个选项时(selectedOptIndex 变为非空),右栏自动切到「选项」tab,
+  // 并让选项编辑器下拉定位到该项(下拉本身读 selectedOptIndex,故此处只管切 tab)。
+  useEffect(() => {
+    if (selectedOptIndex !== null) setTab('options');
+  }, [selectedOptIndex]);
+
   const question = schema?.questions.find((q) => q.id === selectedQid) ?? null;
   if (!question) return <p style={{ color: 'var(--ink-muted)' }}>选中一道题以编辑设置</p>;
 
@@ -42,7 +50,9 @@ export function SettingsPanel() {
 
   return (
     <>
-      <h4>题目设置 · Q{n}</h4>
+      <h4 title={question.title || undefined}>
+        题目设置 · Q{n} <span className="set-q-title">{question.title || '未命名题目'}</span>
+      </h4>
 
       <div className="sub-tabs" id="set-tabs">
         <button className={tab === 'type' ? 'active' : ''} onClick={() => setTab('type')}>题型</button>

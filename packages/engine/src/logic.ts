@@ -38,6 +38,22 @@ function pickComparable(raw: unknown, subId: string | undefined): unknown {
   return raw;
 }
 
+/**
+ * 从多选答案的单个元素取比较值:裸 string/number 原样;带自有 value 字段的对象
+ * (多选带填空项 { value, text })取其 value。用于 includes 逐元素比较。
+ */
+function pickElemValue(el: unknown): unknown {
+  if (
+    el !== null &&
+    typeof el === 'object' &&
+    !Array.isArray(el) &&
+    'value' in (el as Record<string, unknown>)
+  ) {
+    return (el as Record<string, unknown>).value;
+  }
+  return el;
+}
+
 /** 判断单个条件是否成立。空值/未作答语义集中在此,是前后端最易漂移处。 */
 export function evalCondition(cond: Condition, answers: Answers): boolean {
   const raw = answers[cond.qid];
@@ -53,7 +69,9 @@ export function evalCondition(cond: Condition, answers: Answers): boolean {
     case 'ne':
       return a !== cond.value;
     case 'includes':
-      return Array.isArray(a) && a.includes(cond.value);
+      // 多选答案是数组;元素可能是裸 value(string),也可能是带填空的对象 { value, text }。
+      // 对每个元素钻取其比较值(对象取 .value)后再比,才能匹配到带填空的选中项。
+      return Array.isArray(a) && a.some((el) => pickElemValue(el) === cond.value);
     case 'gt':
       return typeof a === 'number' && typeof cond.value === 'number' && a > cond.value;
     case 'lt':

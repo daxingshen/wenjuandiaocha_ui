@@ -1,15 +1,16 @@
 /**
- * 中栏画布内选中单选题的「编辑态」选项列表(studio 专属,决策2-A):
+ * 中栏画布内选中「选择题」的编辑态选项列表(studio 专属,决策2-A):
  * 选项可内联改文字、点选高亮(与右栏选项 tab 双向同步)、✕ 删除、拖拽把手原生 DnD 重排。
+ * 单选(radio 记号)与多选(checkbox 记号)共用本组件,靠 mode 区分记号形态——选项结构同源。
  * 不走作答端 Answer 组件(那是只读预览);作答端契约 AnswerProps 因此保持零负担。
- * 用原型 .opt-list/.opt-row/.opt-ed/.oin/.drag/.obtn 类(样式见 components.css,T9)。
+ * 用原型 .opt-list/.opt-row/.opt-ed/.oin/.drag/.obtn 类(样式见 components.css)。
  */
 import { useState } from 'react';
 import type { Question } from '@xingjuan/engine';
 import type { SingleChoiceOption, SingleChoiceProps } from '@xingjuan/question-types';
 import { useEditorStore } from './useEditorStore.js';
 
-export function SingleChoiceCanvasEditor({ question }: { question: Question }) {
+export function ChoiceCanvasEditor({ question, mode }: { question: Question; mode: 'single' | 'multi' }) {
   const updateQuestion = useEditorStore((s) => s.updateQuestion);
   const selectedOptIndex = useEditorStore((s) => s.selectedOptIndex);
   const selectOption = useEditorStore((s) => s.selectOption);
@@ -71,7 +72,8 @@ export function SingleChoiceCanvasEditor({ question }: { question: Question }) {
               >
                 ⠿
               </span>
-              <span className="mk" />
+              {/* 单选=圆点记号,多选=方块记号(纯视觉,预览用) */}
+              <span className={mode === 'multi' ? 'mk mk-check' : 'mk'} />
               <input
                 className="oin"
                 placeholder="选项文字"
@@ -82,7 +84,12 @@ export function SingleChoiceCanvasEditor({ question }: { question: Question }) {
                   fontSize: opt.style?.fontSize,
                   fontWeight: opt.style?.bold ? 700 : undefined,
                 }}
-                onClick={(e) => e.stopPropagation()}
+                // 点/聚焦文本框也选中该项(切右栏「选项」tab);stopPropagation 防冒泡到题选中。
+                onFocus={() => selectOption(i)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  selectOption(i);
+                }}
                 onChange={(e) => setLabel(i, e.target.value)}
               />
               {opt.fill?.enabled && <span className="opt-flag">填空</span>}
