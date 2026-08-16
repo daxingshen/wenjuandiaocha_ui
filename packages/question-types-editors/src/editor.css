@@ -36,6 +36,24 @@
 .fill-row-ed { margin-bottom: 10px; }
 .fill-row-ed .fill-ph-field { width: 100%; border: 1px dashed var(--line, #e1e0d9); border-radius: 7px; padding: 6px 9px; font: inherit; font-size: 12px; color: var(--ink-2, #52514e); background: var(--surface-2, #fcfcfb); margin-top: 4px; }
 .fill-row-ed .fill-ph-field:focus { outline: none; border-style: solid; border-color: var(--brand, #2a78d6); background: var(--surface, #fff); }
+/* 多项填空:每个填空框一张卡,内部字段全用统一 .field 样式(与其它题型一致) */
+.blank-card { border: 1px solid var(--line, #e1e0d9); border-radius: 10px; padding: 12px; margin-bottom: 10px; background: var(--surface-2, #fcfcfb); }
+.blank-card .field:last-child { margin-bottom: 0; }
+.blank-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.blank-card-head .blank-idx { font-size: 12px; font-weight: 600; color: var(--brand, #2a78d6); }
+.blank-card-head .del { width: 26px; height: 26px; border: 1px solid var(--line, #e1e0d9); border-radius: 7px; background: var(--surface, #fff); color: var(--ink-muted, #898781); flex: none; cursor: pointer; transition: .15s; }
+.blank-card-head .del:hover { border-color: var(--critical, #d03b3b); color: var(--critical, #d03b3b); }
+/* 多项填空:纵向平铺的填空框选择器(点选 → 对选中框操作;每行带删除,底部加行) */
+.blank-picker { display: flex; flex-direction: column; gap: 6px; }
+.blank-pick { display: flex; align-items: center; gap: 6px; padding: 0; border: 1px solid var(--line, #e1e0d9); border-radius: 8px; background: var(--surface-2, #fcfcfb); transition: border-color .15s, background .15s; }
+.blank-pick:hover { border-color: color-mix(in srgb, var(--brand, #2a78d6) 45%, var(--line, #e1e0d9)); }
+.blank-pick.on { border-color: var(--brand, #2a78d6); background: var(--brand-weak, #eaf2fc); }
+.blank-pick .blank-pick-label { flex: 1; min-width: 0; text-align: left; padding: 8px 10px; border: none; background: none; font: inherit; color: var(--ink-2, #52514e); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.blank-pick.on .blank-pick-label { color: var(--brand, #2a78d6); font-weight: 600; }
+.blank-pick .del { width: 28px; height: 28px; margin-right: 4px; border: none; background: none; color: var(--ink-muted, #898781); flex: none; cursor: pointer; border-radius: 6px; transition: .15s; }
+.blank-pick .del:hover:not(:disabled) { color: var(--critical, #d03b3b); }
+.blank-pick .del:disabled { opacity: .35; cursor: not-allowed; }
+.blank-add { align-self: flex-start; }
 
 /* ============ 单选题编辑器:题型层 + 选项层设置(§ single-choice Editor) ============ */
 /* 小标题 / 分段标签 */

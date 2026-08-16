@@ -1,5 +1,5 @@
 /**
- * 选项级富编辑(选项 tab):选项选择器 + 选项标题 + 插入图片 + 允许填空 + 样式 + 删除。
+ * 选项级富编辑(选项 tab):纵向平铺选项(点选 + 每行删 + 底部加)→ 选项标题 + 插入图片 + 允许填空 + 样式。
  * 单选与多选共用(选项结构同源 SingleChoiceOption = MultiChoiceOption);抽到 shared 避免两处漂移。
  * 宿主经 selectedOptIndex/onSelectOption 提供选中态(与画布内联编辑器双向同步)。
  */
@@ -34,17 +34,29 @@ export function OptionsSection({ options, setOptions, setOpt, selectedIndex, onS
   return (
     <div className="set-group">
       <div className="field">
-        <label>操作的选项</label>
-        <select value={idx} onChange={(e) => onSelect?.(Number(e.target.value))}>
+        <label>选择选项</label>
+        <div className="blank-picker">
           {options.map((o, i) => (
-            <option key={i} value={i}>{o.label || `选项${i + 1}`}</option>
+            <div key={i} className={`blank-pick${i === idx ? ' on' : ''}`}>
+              <button type="button" className="blank-pick-label" onClick={() => onSelect?.(i)}>
+                {o.label || `选项${i + 1}`}
+              </button>
+              <button
+                type="button"
+                className="del"
+                title="删除此选项"
+                disabled={options.length <= 1}
+                onClick={() => delOption(i)}
+              >
+                ✕
+              </button>
+            </div>
           ))}
-        </select>
+          <button type="button" className="add-opt blank-add" onClick={addOption}>＋ 添加选项</button>
+        </div>
       </div>
 
-      {opt && <OptionBody opt={opt} index={idx} setOpt={setOpt} onDelete={() => delOption(idx)} />}
-
-      <button type="button" className="add-opt" onClick={addOption}>＋ 添加选项</button>
+      {opt && <OptionBody opt={opt} index={idx} setOpt={setOpt} />}
     </div>
   );
 }
@@ -53,10 +65,9 @@ interface OptionBodyProps {
   opt: SingleChoiceOption;
   index: number;
   setOpt: (i: number, next: Partial<SingleChoiceOption>) => void;
-  onDelete: () => void;
 }
 
-function OptionBody({ opt, index, setOpt, onDelete }: OptionBodyProps) {
+function OptionBody({ opt, index, setOpt }: OptionBodyProps) {
   const style = opt.style ?? {};
   const fill = opt.fill;
   const image = opt.image;
@@ -190,10 +201,6 @@ function OptionBody({ opt, index, setOpt, onDelete }: OptionBodyProps) {
           </div>
         </div>
       </details>
-
-      <button type="button" className="obtn del" title="删除选项" onClick={onDelete} style={{ marginTop: 12 }}>
-        ✕ 删除此选项
-      </button>
     </div>
   );
 }

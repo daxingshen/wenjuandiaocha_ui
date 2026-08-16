@@ -34,4 +34,12 @@ describe('textareaHandler.validate', () => {
   it('超长被拒', () => {
     expect(textareaHandler.validate(makeQ({ maxLength: 2 }), 'abc')).toBe('不超过 2 个字符');
   });
+
+  it('过短被拒', () => {
+    expect(textareaHandler.validate(makeQ({ minLength: 5 }), 'abc')).toBe('至少 5 个字符');
+  });
+
+  it('缺省字段(旧问卷)照常通过', () => {
+    expect(textareaHandler.validate(makeQ(), '任意多行文本')).toBeNull();
+  });
 });

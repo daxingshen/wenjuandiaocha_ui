@@ -177,6 +177,8 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .q-title .req { color: var(--critical); margin-right: 3px; }
 .q-title .no { color: var(--brand); margin-right: 8px; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
 .q-title .logic-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .02em; color: var(--s7); background: color-mix(in srgb, var(--s7) 14%, transparent); padding: 2px 9px; border-radius: 999px; margin-left: 8px; }
+/* 填空题属性验证徽标(画布标记所选验证器,参考原型 .fmt-badge)。填空题在题干后、多项填空在每框行内。 */
+.fmt-badge { font-size: 10.5px; font-weight: 700; color: var(--brand); background: var(--brand-weak); border: 1px solid var(--brand); border-radius: 999px; padding: 1px 8px; margin-left: 8px; flex: none; white-space: nowrap; }
 /* 画布内题干内联编辑(所有题型通用):平时透明融入,hover/聚焦才显边框 */
 .q-title .q-title-in { flex: 1; min-width: 160px; font: inherit; font-weight: 650; font-size: 15px; letter-spacing: -.01em; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 3px 7px; margin: -3px 0; transition: border-color .15s, background .15s, box-shadow .15s; }
 .q-title .q-title-in::placeholder { color: var(--ink-muted); font-style: italic; font-weight: 500; }
@@ -382,6 +384,18 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .a-scale .s.on { background: var(--brand); color: #fff; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-weak); }
 .a-ta { width: 100%; min-height: 72px; border: 1px solid var(--line); border-radius: 11px; padding: 11px 12px; font: inherit; resize: none; background: var(--surface); color: var(--ink); transition: border-color .15s, box-shadow .15s; }
 .a-ta:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-weak); }
+/* 填空作答态:单行输入(填空 / 多项填空每框) */
+.a-in { width: 100%; max-width: 420px; border: 1px solid var(--line); border-radius: 11px; padding: 11px 12px; font: inherit; background: var(--surface); color: var(--ink); transition: border-color .15s, box-shadow .15s; }
+.a-in:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-weak); }
+.a-in:disabled, .a-ta:disabled { cursor: default; color: var(--ink-2); }
+/* 多项填空:每框一行,标签在左 */
+.multi-fill { display: flex; flex-direction: column; gap: 10px; }
+.multi-fill .mf-row { display: flex; align-items: center; gap: 12px; }
+.multi-fill .mf-label { min-width: 76px; font: inherit; font-weight: 400; color: var(--ink-2); text-align: right; flex: none; }
+.multi-fill .mf-row .a-in, .multi-fill .mf-row .ans-select { max-width: 320px; }
+/* 多项填空画布内联编辑行:标签输入 + ✕ 删框 */
+.multi-fill .mf-row-ed .mf-label-in { min-width: 76px; width: 96px; flex: none; border: 1px solid var(--line); border-radius: 8px; padding: 8px 9px; font: inherit; font-weight: 400; color: var(--ink-2); background: var(--surface-2); }
+.multi-fill .mf-row-ed .mf-label-in:focus { outline: none; border-color: var(--brand); background: var(--surface); box-shadow: 0 0 0 3px var(--brand-weak); }
 /* 下拉框作答态:原生 select */
 .ans-select { width: 100%; max-width: 340px; border: 1px solid var(--line); border-radius: 11px; padding: 11px 12px; font: inherit; background: var(--surface); color: var(--ink); cursor: pointer; transition: border-color .15s, box-shadow .15s; }
 .ans-select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-weak); }

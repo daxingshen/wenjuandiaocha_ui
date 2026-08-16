@@ -9,9 +9,18 @@ import { useEditorStore } from './useEditorStore.js';
 import { ChoiceCanvasEditor } from './ChoiceCanvasEditor.js';
 import { MatrixCanvasEditor } from './MatrixCanvasEditor.js';
 import { DropdownCanvasPreview } from './DropdownCanvasPreview.js';
+import { TextCanvasEditor } from './TextCanvasEditor.js';
 
 /** 有中栏画布内联编辑器的矩阵题型(选中时走可编辑表,而非只读 Answer 预览)。 */
 const MATRIX_TYPES = new Set(['matrix-single', 'matrix-multi', 'matrix-scale', 'matrix-fill', 'matrix-slider']);
+/** 有中栏画布内联编辑器的文本题型(选中时输入框可编辑默认值,而非只读预览)。 */
+const TEXT_TYPES = new Set(['text-input', 'textarea', 'multi-fill']);
+
+/** 填空题属性验证 format → 画布提示徽标文案(text/缺省不标)。 */
+const FORMAT_BADGE: Record<string, string> = {
+  email: '邮箱', phone: '手机号', integer: '整数', decimal: '小数', date: '日期',
+  age: '年龄', province: '省份', idcard: '身份证', zipcode: '邮编', url: '网址',
+};
 
 export function Canvas() {
   const schema = useEditorStore((s) => s.schema);
@@ -79,6 +88,9 @@ export function Canvas() {
                 onFocus={() => selectQuestion(q.id)}
                 onChange={(e) => updateQuestion(q.id, { title: e.target.value })}
               />
+              {q.type === 'text-input' && FORMAT_BADGE[(q.props as { format?: string }).format ?? 'text'] && (
+                <span className="fmt-badge">{FORMAT_BADGE[(q.props as { format?: string }).format ?? 'text']}</span>
+              )}
               {hasLogic && <span className="logic-tag">关联逻辑</span>}
             </div>
             {q.hint && <div className="q-hint">{q.hint}</div>}
@@ -94,6 +106,9 @@ export function Canvas() {
             ) : q.type === 'dropdown' && selected ? (
               // 选中的下拉框:画布以「展开的下拉」平铺全部选项,可内联改字 + 增删,与右栏双向同步。
               <DropdownCanvasPreview question={q} />
+            ) : TEXT_TYPES.has(q.type) && selected ? (
+              // 选中的文本题:输入框可内联打字设默认值(多项填空另可改框标签 + 增删框),与右栏双向同步。
+              <TextCanvasEditor question={q} />
             ) : Answer ? (
               // 未选中:只读预览。禁用指针事件,让点击任意处都落到 q-block 选中该题
               // (否则点在 disabled 表单控件上不冒泡,只能点空白才切换)。
