@@ -1,26 +1,14 @@
 /**
- * 编辑器中栏:题目画布。列出当前 schema 的题目,每题用其题型的 Answer(question-types)
- * 做实时预览——与作答端同一份渲染,所见即所得。点击选中高亮,工具条 ↑↓⧉🗑 调 store。
+ * 编辑器中栏:题目画布。列出当前 schema 的题目。选中题走其题型自带的画布内联编辑组件
+ * (getCanvasEditor(type),§20 题型自包含);题型未提供画布编辑组件或未选中时走只读 Answer 预览。
+ * 题干在画布内联可编辑(所有题型通用)。题干徽标由题型描述符 canvasBadge 提供(题型无关外壳)。
  * 用原型 .paper / .q-block 类(ui/components.css)。外层 .ed-center 由 Editor 提供。
+ *
+ * 本文件不含任何具体题型 type 字符串:加题型只在 editors 包声明 canvasEditor/canvasBadge,此处零改。
  */
 import { useEffect, useRef } from 'react';
-import { getAnswer } from '@xingjuan/question-types';
+import { getAnswer, getEditor, getCanvasEditor } from '@xingjuan/question-types';
 import { useEditorStore } from './useEditorStore.js';
-import { ChoiceCanvasEditor } from './ChoiceCanvasEditor.js';
-import { MatrixCanvasEditor } from './MatrixCanvasEditor.js';
-import { DropdownCanvasPreview } from './DropdownCanvasPreview.js';
-import { TextCanvasEditor } from './TextCanvasEditor.js';
-
-/** 有中栏画布内联编辑器的矩阵题型(选中时走可编辑表,而非只读 Answer 预览)。 */
-const MATRIX_TYPES = new Set(['matrix-single', 'matrix-multi', 'matrix-scale', 'matrix-fill', 'matrix-slider']);
-/** 有中栏画布内联编辑器的文本题型(选中时输入框可编辑默认值,而非只读预览)。 */
-const TEXT_TYPES = new Set(['text-input', 'textarea', 'multi-fill']);
-
-/** 填空题属性验证 format → 画布提示徽标文案(text/缺省不标)。 */
-const FORMAT_BADGE: Record<string, string> = {
-  email: '邮箱', phone: '手机号', integer: '整数', decimal: '小数', date: '日期',
-  age: '年龄', province: '省份', idcard: '身份证', zipcode: '邮编', url: '网址',
-};
 
 export function Canvas() {
   const schema = useEditorStore((s) => s.schema);
@@ -30,6 +18,8 @@ export function Canvas() {
   const moveQuestion = useEditorStore((s) => s.moveQuestion);
   const removeQuestion = useEditorStore((s) => s.removeQuestion);
   const updateQuestion = useEditorStore((s) => s.updateQuestion);
+  const selectedOptIndex = useEditorStore((s) => s.selectedOptIndex);
+  const selectOption = useEditorStore((s) => s.selectOption);
 
   // 新增题目后(题量增加)把新题滚入视野;仅点击切换题目(题量不变)不滚动。
   const prevCount = useRef(schema?.questions.length ?? 0);
@@ -61,6 +51,8 @@ export function Canvas() {
 
       {schema.questions.map((q, i) => {
         const Answer = getAnswer(q.type);
+        const CanvasEditor = getCanvasEditor(q.type);
+        const badge = getEditor(q.type)?.canvasBadge?.(q) ?? null;
         const selected = q.id === selectedQid;
         const hasLogic = schema.rules.some((r) => r.action.target === q.id);
         return (
@@ -88,30 +80,21 @@ export function Canvas() {
                 onFocus={() => selectQuestion(q.id)}
                 onChange={(e) => updateQuestion(q.id, { title: e.target.value })}
               />
-              {q.type === 'text-input' && FORMAT_BADGE[(q.props as { format?: string }).format ?? 'text'] && (
-                <span className="fmt-badge">{FORMAT_BADGE[(q.props as { format?: string }).format ?? 'text']}</span>
-              )}
+              {badge && <span className="fmt-badge">{badge}</span>}
               {hasLogic && <span className="logic-tag">关联逻辑</span>}
             </div>
             {q.hint && <div className="q-hint">{q.hint}</div>}
-            {q.type === 'single-choice' && selected ? (
-              // 选中的单选题:中栏走可内联编辑的选项列表(studio 专属),而非只读预览。
-              <ChoiceCanvasEditor question={q} mode="single" />
-            ) : q.type === 'multi-choice' && selected ? (
-              // 选中的多选题:同单选,记号为多选方块。
-              <ChoiceCanvasEditor question={q} mode="multi" />
-            ) : MATRIX_TYPES.has(q.type) && selected ? (
-              // 选中的矩阵题:中栏走可内联编辑的矩阵表(改行/列标签、增删行列),而非只读预览。
-              <MatrixCanvasEditor question={q} />
-            ) : q.type === 'dropdown' && selected ? (
-              // 选中的下拉框:画布以「展开的下拉」平铺全部选项,可内联改字 + 增删,与右栏双向同步。
-              <DropdownCanvasPreview question={q} />
-            ) : TEXT_TYPES.has(q.type) && selected ? (
-              // 选中的文本题:输入框可内联打字设默认值(多项填空另可改框标签 + 增删框),与右栏双向同步。
-              <TextCanvasEditor question={q} />
+            {selected && CanvasEditor ? (
+              // 选中且题型自带画布内联编辑:走 studio 专属可编辑视图(题型无关地查表)。
+              <CanvasEditor
+                question={q}
+                onChange={(patch) => updateQuestion(q.id, patch)}
+                selectedOptIndex={selectedOptIndex}
+                onSelectOption={selectOption}
+              />
             ) : Answer ? (
-              // 未选中:只读预览。禁用指针事件,让点击任意处都落到 q-block 选中该题
-              // (否则点在 disabled 表单控件上不冒泡,只能点空白才切换)。
+              // 未选中,或该题型未提供画布编辑器:只读预览。禁用指针事件,让点击任意处
+              // 都落到 q-block 选中该题(否则点在 disabled 表单控件上不冒泡,只能点空白才切换)。
               <div style={{ pointerEvents: 'none' }}>
                 <Answer question={q} value={undefined} onChange={() => {}} disabled />
               </div>

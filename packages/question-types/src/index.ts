@@ -36,8 +36,15 @@ export function registerAll(): void {
   registerTextarea();
 }
 
-export { getAnswer, registerAnswer, getEditor, registerEditor } from './types.js';
-export type { AnswerProps, EditorProps } from './types.js';
+export {
+  getAnswer,
+  registerAnswer,
+  getEditor,
+  registerEditor,
+  getEditorComponent,
+  getCanvasEditor,
+} from './types.js';
+export type { AnswerProps, EditorProps, CanvasEditorProps, EditorRegistration } from './types.js';
 export { matrixWrapProps } from './matrix-layout.js';
 export type { MatrixLayout, MatrixWrapAttrs } from './matrix-layout.js';
 

@@ -3,14 +3,19 @@
  * 选中时输入框可直接打字,写入 props.defaultValue(默认值)——与右栏「默认值」双向同步。
  * 多项填空:每框可内联改标签 + 打字设该框默认值 + ✕ 删框 / ＋ 增框(与右栏「选项」tab 同步)。
  * 不走作答端 Answer 组件(§15:作答端契约零负担);属性验证/字数等仍在右栏设。
+ *
+ * §20 上移进 editors 包:三文本题型 text-input/textarea/multi-fill 共用本组件(各自 index.ts
+ * import 指向它);对宿主依赖从 useEditorStore 收敛为标准 CanvasEditorProps.onChange。
+ * 每框级徽标(多项填空)在本组件内部逐框渲染,整题级徽标(单行填空)经描述符 canvasBadge 走题干区。
+ * FORMAT_BADGE 亦供 text-input 描述符的 canvasBadge 复用(见 ./index.ts),归并原 studio 两处重复。
+ * 全部类在 @xingjuan/ui components.css。
  */
-import type { Question } from '@xingjuan/engine';
+import type { CanvasEditorProps } from '@xingjuan/question-types';
 import type { MultiFillBlank, MultiFillProps, TextInputProps, TextareaProps } from '@xingjuan/question-types';
 import { normalizeFormat } from '@xingjuan/question-types';
-import { useEditorStore } from './useEditorStore.js';
 
-/** 属性验证 format → 画布提示徽标文案(text/缺省不标)。 */
-const FORMAT_BADGE: Record<string, string> = {
+/** 属性验证 format → 画布提示徽标文案(text/缺省不标)。供每框徽标与题干 canvasBadge 共用。 */
+export const FORMAT_BADGE: Record<string, string> = {
   email: '邮箱', phone: '手机号', integer: '整数', decimal: '小数', date: '日期',
   age: '年龄', province: '省份', idcard: '身份证', zipcode: '邮编', url: '网址',
 };
@@ -30,10 +35,9 @@ function inputAttrs(format: string): { type: string; inputMode?: 'numeric' | 'de
   }
 }
 
-export function TextCanvasEditor({ question }: { question: Question }) {
-  const updateQuestion = useEditorStore((s) => s.updateQuestion);
+export function TextCanvasEditor({ question, onChange }: CanvasEditorProps) {
   const patch = (next: Record<string, unknown>) =>
-    updateQuestion(question.id, { props: { ...question.props, ...next } });
+    onChange({ props: { ...question.props, ...next } });
 
   // ---------- 简答(多行) ----------
   if (question.type === 'textarea') {
