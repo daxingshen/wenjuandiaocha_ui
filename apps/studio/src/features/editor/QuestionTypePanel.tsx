@@ -28,6 +28,7 @@ const TYPE_ICON: Record<string, string> = {
   'matrix-scale': '▧',
   'matrix-fill': '▤',
   'matrix-slider': '⇔',
+  'multi-fill': '⊞',
 };
 
 export function QuestionTypePanel() {

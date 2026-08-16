@@ -38,4 +38,20 @@ describe('textInputHandler.validate', () => {
   it('超长被拒', () => {
     expect(textInputHandler.validate(makeQ({ maxLength: 3 }), 'abcd')).toBe('不超过 3 个字符');
   });
+
+  it('过短被拒', () => {
+    expect(textInputHandler.validate(makeQ({ minLength: 3 }), 'ab')).toBe('至少 3 个字符');
+  });
+
+  it('扩展 format:integer/date/province', () => {
+    expect(textInputHandler.validate(makeQ({ format: 'integer' }), '42')).toBeNull();
+    expect(textInputHandler.validate(makeQ({ format: 'integer' }), '4.2')).toBe('请填写整数');
+    expect(textInputHandler.validate(makeQ({ format: 'date' }), '2026-02-30')).toBe('日期格式应为 YYYY-MM-DD');
+    expect(textInputHandler.validate(makeQ({ format: 'province' }), '广东省')).toBeNull();
+    expect(textInputHandler.validate(makeQ({ format: 'province' }), '火星省')).toBe('请选择省份');
+  });
+
+  it('缺省字段(旧问卷)照常通过', () => {
+    expect(textInputHandler.validate(makeQ(), '任意文本')).toBeNull();
+  });
 });

@@ -28,9 +28,10 @@ export interface EditorProps {
   /**
    * 右栏分 tab 渲染时的分区提示:
    * - 'type':题型层设置(如排列方式);'options':选项层设置(选项列表/图片/填空/样式)。
+   * - 'input':输入项设置(填空题的属性验证/字数/默认值)。
    * - 缺省(undefined):不分区,渲染全部(向后兼容,其余题型编辑器忽略本字段)。
    */
-  section?: 'type' | 'options';
+  section?: 'type' | 'options' | 'input';
   /**
    * 当前选中的选项下标(选项级编辑用)。由宿主(studio)提供,与中栏画布内联选中双向同步;
    * 题型编辑器不感知宿主状态来源。undefined 表示宿主未提供选项选中通道(编辑器自理即可)。
