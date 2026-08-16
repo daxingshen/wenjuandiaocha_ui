@@ -54,8 +54,8 @@
 .dual input { width: 100%; }
 .color-in { width: 38px; height: 26px; padding: 0; border: 1px solid var(--line, #e1e0d9); border-radius: 6px; background: none; cursor: pointer; flex: none; }
 
-/* 填空子配置块 */
-.sub-fill { border: 1px solid var(--line-soft, rgba(11, 11, 11, 0.06)); border-radius: 8px; padding: 12px; margin-top: 4px; background: var(--surface-2, #fcfcfb); }
+/* 填空子配置块:左侧品牌色竖条 + 左内边距(对齐原型 prototype-choice.html) */
+.sub-fill { border-left: 2px solid var(--brand-weak, #eaf2fc); padding-left: 10px; margin: 4px 0 8px; }
 
 /* 选项行上的能力标记(填空)、图片标记 —— 右栏选项列表用 */
 .opt-flag { font-size: 10.5px; font-weight: 600; color: var(--brand, #2a78d6); background: var(--brand-weak, #eaf2fc); padding: 1px 7px; border-radius: 999px; flex: none; }
@@ -65,10 +65,12 @@
 #opt-body .obtn.del { font-size: 13px; color: var(--ink-muted, #898781); border: 1px solid var(--line, #e1e0d9); border-radius: 8px; background: var(--surface-2, #fcfcfb); padding: 6px 12px; cursor: pointer; }
 #opt-body .obtn.del:hover { border-color: var(--critical, #d03b3b); color: var(--critical, #d03b3b); }
 
-/* 折叠组(插入图片 / 样式设置):用原生 <details>,summary 即 fold-head。 */
-.fold { border-top: 1px solid var(--line-soft, rgba(11, 11, 11, 0.06)); margin-top: 12px; padding-top: 4px; }
-.fold-head { display: flex; align-items: center; justify-content: space-between; cursor: pointer; padding: 8px 0; font-size: 12.5px; font-weight: 600; color: var(--ink-2, #52514e); user-select: none; list-style: none; }
+/* 折叠组(插入图片 / 样式设置):用原生 <details>,summary 即 fold-head。
+   卡片式:整块描边 + 圆角 + surface-2 底色;展开时 summary 下方加分隔线(对齐原型 prototype-choice.html)。 */
+.fold { border: 1px solid var(--line, #e1e0d9); border-radius: 8px; margin: 8px 0; background: var(--surface-2, #fcfcfb); }
+.fold-head { display: flex; align-items: center; justify-content: space-between; cursor: pointer; padding: 8px 10px; font-size: 12.5px; font-weight: 600; color: var(--ink-2, #52514e); user-select: none; list-style: none; }
 .fold-head::-webkit-details-marker { display: none; }
+.fold[open] .fold-head { border-bottom: 1px solid var(--line, #e1e0d9); }
 .fold-head .chev { transition: .15s; color: var(--ink-muted, #898781); }
 .fold[open] .fold-head .chev { transform: rotate(90deg); }
-.fold-body { padding: 4px 0; }
+.fold-body { padding: 10px; }

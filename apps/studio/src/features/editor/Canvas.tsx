@@ -6,8 +6,9 @@
 import { useEffect, useRef } from 'react';
 import { getAnswer } from '@xingjuan/question-types';
 import { useEditorStore } from './useEditorStore.js';
-import { SingleChoiceCanvasEditor } from './SingleChoiceCanvasEditor.js';
+import { ChoiceCanvasEditor } from './ChoiceCanvasEditor.js';
 import { MatrixCanvasEditor } from './MatrixCanvasEditor.js';
+import { DropdownCanvasPreview } from './DropdownCanvasPreview.js';
 
 /** 有中栏画布内联编辑器的矩阵题型(选中时走可编辑表,而非只读 Answer 预览)。 */
 const MATRIX_TYPES = new Set(['matrix-single', 'matrix-multi', 'matrix-scale', 'matrix-fill', 'matrix-slider']);
@@ -19,6 +20,7 @@ export function Canvas() {
   const selectQuestion = useEditorStore((s) => s.selectQuestion);
   const moveQuestion = useEditorStore((s) => s.moveQuestion);
   const removeQuestion = useEditorStore((s) => s.removeQuestion);
+  const updateQuestion = useEditorStore((s) => s.updateQuestion);
 
   // 新增题目后(题量增加)把新题滚入视野;仅点击切换题目(题量不变)不滚动。
   const prevCount = useRef(schema?.questions.length ?? 0);
@@ -67,16 +69,31 @@ export function Canvas() {
             <div className="q-title">
               {q.required && <span className="req">*</span>}
               <span className="no">Q{i + 1}</span>
-              <span>{q.title}</span>
+              {/* 题干在画布内联可编辑(所有题型通用);点击不冒泡到题选中,聚焦即选中该题。 */}
+              <input
+                className="q-title-in"
+                value={q.title}
+                placeholder="未命名题目"
+                aria-label={`Q${i + 1} 题目标题`}
+                onClick={(e) => e.stopPropagation()}
+                onFocus={() => selectQuestion(q.id)}
+                onChange={(e) => updateQuestion(q.id, { title: e.target.value })}
+              />
               {hasLogic && <span className="logic-tag">关联逻辑</span>}
             </div>
             {q.hint && <div className="q-hint">{q.hint}</div>}
             {q.type === 'single-choice' && selected ? (
               // 选中的单选题:中栏走可内联编辑的选项列表(studio 专属),而非只读预览。
-              <SingleChoiceCanvasEditor question={q} />
+              <ChoiceCanvasEditor question={q} mode="single" />
+            ) : q.type === 'multi-choice' && selected ? (
+              // 选中的多选题:同单选,记号为多选方块。
+              <ChoiceCanvasEditor question={q} mode="multi" />
             ) : MATRIX_TYPES.has(q.type) && selected ? (
               // 选中的矩阵题:中栏走可内联编辑的矩阵表(改行/列标签、增删行列),而非只读预览。
               <MatrixCanvasEditor question={q} />
+            ) : q.type === 'dropdown' && selected ? (
+              // 选中的下拉框:画布以「展开的下拉」平铺全部选项,可内联改字 + 增删,与右栏双向同步。
+              <DropdownCanvasPreview question={q} />
             ) : Answer ? (
               // 未选中:只读预览。禁用指针事件,让点击任意处都落到 q-block 选中该题
               // (否则点在 disabled 表单控件上不冒泡,只能点空白才切换)。

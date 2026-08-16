@@ -15,6 +15,7 @@ import { registerMatrixScale } from './matrix-scale/index.js';
 import { registerMatrixFill } from './matrix-fill/index.js';
 import { registerMatrixSlider } from './matrix-slider/index.js';
 import { registerMultiChoice } from './multi-choice/index.js';
+import { registerDropdown } from './dropdown/index.js';
 import { registerScale } from './scale/index.js';
 import { registerTextInput } from './text-input/index.js';
 import { registerTextarea } from './textarea/index.js';
@@ -27,6 +28,7 @@ export function registerAll(): void {
   registerMatrixFill();
   registerMatrixSlider();
   registerMultiChoice();
+  registerDropdown();
   registerScale();
   registerTextInput();
   registerTextarea();
@@ -49,7 +51,8 @@ export type { MatrixMultiProps, MatrixMultiAnswer } from './matrix-multi/index.j
 export type { MatrixScaleProps, MatrixScaleAnswer } from './matrix-scale/index.js';
 export type { MatrixFillProps, MatrixFillAnswer } from './matrix-fill/index.js';
 export type { MatrixSliderProps, MatrixSliderAnswer } from './matrix-slider/index.js';
-export type { MultiChoiceProps } from './multi-choice/index.js';
+export type { MultiChoiceProps, MultiChoiceOption, MultiChoiceAnswerItem } from './multi-choice/index.js';
+export type { DropdownProps, DropdownOption } from './dropdown/index.js';
 export type { ScaleProps } from './scale/index.js';
 export type { TextInputProps, TextFormat } from './text-input/index.js';
 export type { TextareaProps } from './textarea/index.js';

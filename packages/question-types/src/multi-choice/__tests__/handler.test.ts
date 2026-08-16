@@ -28,6 +28,31 @@ describe('multiChoiceHandler.normalize', () => {
   it('非数组答案产出空数组', () => {
     expect(multiChoiceHandler.normalize(makeQ(), 'a')).toEqual([]);
   });
+
+  it('混合数组:填空项额外产 subId=<optValue>.fill 行', () => {
+    const q = makeQ({
+      props: {
+        options: [
+          { value: 'a', label: 'A' },
+          { value: 'other', label: '其他', fill: { enabled: true } },
+        ],
+      },
+    });
+    expect(multiChoiceHandler.normalize(q, ['a', { value: 'other', text: '地铁广告' }])).toEqual([
+      { qid: 'q1', value: 'a' },
+      { qid: 'q1', value: 'other' },
+      { qid: 'q1', subId: 'other.fill', value: '地铁广告' },
+    ]);
+  });
+
+  it('混合数组:填空文本为空不产 fill 行', () => {
+    const q = makeQ({
+      props: { options: [{ value: 'other', label: '其他', fill: { enabled: true } }] },
+    });
+    expect(multiChoiceHandler.normalize(q, [{ value: 'other', text: '' }])).toEqual([
+      { qid: 'q1', value: 'other' },
+    ]);
+  });
 });
 
 describe('multiChoiceHandler.validate', () => {
@@ -61,5 +86,35 @@ describe('multiChoiceHandler.validate', () => {
     expect(multiChoiceHandler.validate(makeQ({ props: { options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }, { value: 'c', label: 'C' }], max: 2 } }), ['a', 'b', 'c'])).toBe(
       '最多选择 2 项',
     );
+  });
+
+  it('混合数组:合法(裸 string + 填空对象)通过', () => {
+    const q = makeQ({
+      props: {
+        options: [
+          { value: 'a', label: 'A' },
+          { value: 'other', label: '其他', fill: { enabled: true } },
+        ],
+      },
+    });
+    expect(multiChoiceHandler.validate(q, ['a', { value: 'other', text: '地铁' }])).toBeNull();
+  });
+
+  it('填空必填但文本空 → 报错', () => {
+    const q = makeQ({
+      props: { options: [{ value: 'other', label: '其他', fill: { enabled: true, required: true } }] },
+    });
+    expect(multiChoiceHandler.validate(q, [{ value: 'other', text: '  ' }])).toBe('请填写补充内容');
+  });
+
+  it('混合数组:对象与裸 string 指向同一 value 视为重复', () => {
+    const q = makeQ({
+      props: { options: [{ value: 'other', label: '其他', fill: { enabled: true } }] },
+    });
+    expect(multiChoiceHandler.validate(q, ['other', { value: 'other', text: 'x' }])).toBe('选项不可重复');
+  });
+
+  it('元素格式非法(数字)被拒', () => {
+    expect(multiChoiceHandler.validate(makeQ(), [1, 2] as unknown[])).toBe('包含不存在的选项');
   });
 });

@@ -13,6 +13,7 @@ import { registerMatrixScaleEditor } from './matrix-scale/index.js';
 import { registerMatrixFillEditor } from './matrix-fill/index.js';
 import { registerMatrixSliderEditor } from './matrix-slider/index.js';
 import { registerMultiChoiceEditor } from './multi-choice/index.js';
+import { registerDropdownEditor } from './dropdown/index.js';
 import { registerScaleEditor } from './scale/index.js';
 import { registerTextInputEditor } from './text-input/index.js';
 import { registerTextareaEditor } from './textarea/index.js';
@@ -25,6 +26,7 @@ export function registerAllEditors(): void {
   registerMatrixFillEditor();
   registerMatrixSliderEditor();
   registerMultiChoiceEditor();
+  registerDropdownEditor();
   registerScaleEditor();
   registerTextInputEditor();
   registerTextareaEditor();

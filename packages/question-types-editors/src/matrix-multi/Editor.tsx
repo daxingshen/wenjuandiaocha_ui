@@ -22,6 +22,11 @@ export function MatrixMultiEditor({ question, onChange, section }: EditorProps) 
     const n = Number(v);
     return Number.isNaN(n) ? undefined : n;
   };
+  // 「至少」下限为 2:每行 min=1 与「必答矩阵单选」无异,故最小可设值锁 2。留空 = 不限。
+  const parseMin = (v: string): number | undefined => {
+    const n = parseNum(v);
+    return n === undefined ? undefined : Math.max(2, n);
+  };
 
   return (
     <>
@@ -32,10 +37,10 @@ export function MatrixMultiEditor({ question, onChange, section }: EditorProps) 
               <label>至少选几项</label>
               <input
                 type="number"
-                min={0}
+                min={2}
                 value={p.min ?? ''}
                 placeholder="不限"
-                onChange={(e) => patch({ min: parseNum(e.target.value) })}
+                onChange={(e) => patch({ min: parseMin(e.target.value) })}
               />
             </div>
             <div className="field">

@@ -10,4 +10,4 @@ export function registerMultiChoice(): void {
 }
 
 export { multiChoiceHandler } from './handler.js';
-export type { MultiChoiceProps } from './handler.js';
+export type { MultiChoiceProps, MultiChoiceOption, MultiChoiceAnswerItem } from './handler.js';
