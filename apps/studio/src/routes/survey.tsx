@@ -155,13 +155,8 @@ export function SurveyRoute() {
   const renderActions = () => {
     switch (tab) {
       case 'preview':
-        // 正在验证作答,动作是回去改或去发布——不再有冗余的「预览」
-        return (
-          <>
-            <button className="btn sm" onClick={() => navigate(`/survey/${id}/edit`)}>✎ 返回编辑</button>
-            <button className="btn primary sm" onClick={() => navigate(`/survey/${id}/publish`)}>🚀 发布问卷</button>
-          </>
-        );
+        // 预览是发布前的作答自检,顶栏只留「返回编辑」;发布动作集中在发布页,避免此处二次入口。
+        return <button className="btn sm" onClick={() => navigate(`/survey/${id}/edit`)}>✎ 返回编辑</button>;
       case 'publish':
         // 发布/结束/复制链接等场景动作在页面内(Publish),顶栏只留返回导航,避免双入口。
         return <button className="btn sm" onClick={() => navigate('/home')}>返回</button>;
