@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from 'react';
 import type { SurveySchema } from '@xingjuan/engine';
-import { ApiError, fetchSurvey, submitAnswers, submitAnswersAuthed, type AnswerAccess, type SubmitFn } from './api/client.js';
+import { ApiError, fetchSurvey, submitAnswers, submitAnswersAuthed, type AnswerAccess, type DisplayMode, type SubmitFn } from './api/client.js';
 import { Fill, type FillAuth } from './pages/Fill.js';
 import { Done } from './pages/Done.js';
 import { LoginGate } from './pages/LoginGate.js';
@@ -54,7 +54,7 @@ function surveyIdFromHash(): string {
 
 type LoadState =
   | { status: 'loading' }
-  | { status: 'ready'; schema: SurveySchema; answerAccess: AnswerAccess; demo: boolean }
+  | { status: 'ready'; schema: SurveySchema; answerAccess: AnswerAccess; displayMode: DisplayMode; demo: boolean }
   // notFound=true(后端 404:不存在/未发布/已结束)不可重试;否则(网络/5xx)可重试
   | { status: 'error'; message: string; notFound: boolean };
 
@@ -75,20 +75,21 @@ export function App() {
     let alive = true;
     // 无 id:本地开发直开,用 demo 并标注(anonymous)。真实 :id 链接不再回落 demo(gate① 决议)。
     if (!id) {
-      setLoad({ status: 'ready', schema: DEMO, answerAccess: 'anonymous', demo: true });
+      setLoad({ status: 'ready', schema: DEMO, answerAccess: 'anonymous', displayMode: 'single', demo: true });
       return;
     }
     setLoad({ status: 'loading' });
     fetchSurvey(id)
-      .then(({ schema, answerAccess }) => alive && setLoad({ status: 'ready', schema, answerAccess, demo: false }))
+      .then(({ schema, answerAccess, displayMode }) => alive && setLoad({ status: 'ready', schema, answerAccess, displayMode, demo: false }))
       .catch((e: unknown) => {
         if (!alive) return;
         const notFound = e instanceof ApiError && e.notFound;
         setLoad({
           status: 'error',
           notFound,
+          // notFound 走弹窗呈现(见下),message 只承载可重试错误(网络/5xx)的内联文案。
           message: notFound
-            ? '问卷不存在、未发布或已结束'
+            ? ''
             : e instanceof ApiError && e.message
               ? e.message
               : '加载失败,请稍后重试',
@@ -103,27 +104,39 @@ export function App() {
     return <main style={{ fontFamily: 'var(--font)', textAlign: 'center', padding: 48, color: 'var(--ink-muted)' }}>加载中…</main>;
   }
   if (load.status === 'error') {
+    // notFound(不可重试)走弹窗:不在页面内联负面文案,弹窗告知后留空态。
+    if (load.notFound) {
+      return (
+        <main style={{ fontFamily: 'var(--font)', minHeight: '100vh' }}>
+          <div className="modal-mask" role="dialog" aria-modal="true" aria-label="无法打开">
+            <div className="modal">
+              <div className="modal-title">无法打开这份问卷</div>
+              <div className="modal-body">链接可能已失效或暂不可用,请向分享者确认后再试。</div>
+            </div>
+          </div>
+        </main>
+      );
+    }
+    // 可重试错误(网络/5xx)保持内联 😕 + 文案 + 重试按钮。
     return (
       <main style={{ fontFamily: 'var(--font)', textAlign: 'center', padding: 48, color: 'var(--ink)' }}>
         <div style={{ fontSize: 44, marginBottom: 12 }}>😕</div>
         <p style={{ color: 'var(--critical)', fontSize: 16 }}>{load.message}</p>
-        {!load.notFound && (
-          <button
-            type="button"
-            onClick={() => setReloadKey((k) => k + 1)}
-            style={{
-              marginTop: 20,
-              padding: '10px 20px',
-              border: '1px solid var(--line)',
-              borderRadius: 8,
-              background: 'var(--surface)',
-              color: 'var(--ink)',
-              cursor: 'pointer',
-            }}
-          >
-            重试
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setReloadKey((k) => k + 1)}
+          style={{
+            marginTop: 20,
+            padding: '10px 20px',
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+            background: 'var(--surface)',
+            color: 'var(--ink)',
+            cursor: 'pointer',
+          }}
+        >
+          重试
+        </button>
       </main>
     );
   }
@@ -131,9 +144,9 @@ export function App() {
   // key 绑 id:v{version}:软导航(改 hash 换问卷)或换版时强制重挂,让 useFill 按新 (id,version) 重跑惰性初始化。
   const key = `${load.schema.id}:v${load.schema.version}`;
   if (load.answerAccess === 'login_required') {
-    return <Gated key={key} schema={load.schema} />;
+    return <Gated key={key} schema={load.schema} displayMode={load.displayMode} />;
   }
-  return <Survey key={key} schema={load.schema} demo={load.demo} submit={submitAnswers} />;
+  return <Survey key={key} schema={load.schema} displayMode={load.displayMode} demo={load.demo} submit={submitAnswers} />;
 }
 
 /** 能作答的角色(对齐后端 rbac 能力位:respondent/admin 可提交,creator 不可)。 */
@@ -144,7 +157,7 @@ const CAN_ANSWER_ROLES = new Set(['respondent', 'admin']);
  * 未登录展示 LoginGate,登录后同一 URL 不跳转、直接进 Survey(鉴权提交 + 头部登出)。
  * 已登录但不能作答的账号(creator)在进入作答页前拦下,给换账号入口。
  */
-function Gated({ schema }: { schema: SurveySchema }) {
+function Gated({ schema, displayMode }: { schema: SurveySchema; displayMode: DisplayMode }) {
   const auth = useAuth();
 
   // 进入即探测会话一次(仅 login_required 分支;anonymous 永不走到这里)。
@@ -192,11 +205,11 @@ function Gated({ schema }: { schema: SurveySchema }) {
     );
   }
   const fillAuth: FillAuth = { name: auth.user.name, onLogout: () => void auth.logout() };
-  return <Survey schema={schema} demo={false} submit={submitAnswersAuthed} auth={fillAuth} />;
+  return <Survey schema={schema} displayMode={displayMode} demo={false} submit={submitAnswersAuthed} auth={fillAuth} />;
 }
 
 /** 承载单份问卷的作答态(useFill 依赖稳定的 surveyId,故拆成子组件按 schema.id 挂载)。 */
-function Survey({ schema, demo, submit, auth }: { schema: SurveySchema; demo: boolean; submit: SubmitFn; auth?: FillAuth }) {
+function Survey({ schema, displayMode, demo, submit, auth }: { schema: SurveySchema; displayMode: DisplayMode; demo: boolean; submit: SubmitFn; auth?: FillAuth }) {
   // useFill 依赖稳定的 (surveyId, version):版本锚定,换版后 key 变、答案集隔离。
   const [state, dispatch] = useFill(schema.id, schema.version);
 
@@ -208,7 +221,7 @@ function Survey({ schema, demo, submit, auth }: { schema: SurveySchema; demo: bo
         </div>
       )}
       {state.phase === 'fill' ? (
-        <Fill schema={schema} state={state} dispatch={dispatch} submit={submit} auth={auth} />
+        <Fill schema={schema} displayMode={displayMode} state={state} dispatch={dispatch} submit={submit} auth={auth} />
       ) : (
         <Done rows={state.submittedRows} dispatch={dispatch} auth={auth} />
       )}

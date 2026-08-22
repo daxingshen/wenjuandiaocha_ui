@@ -15,7 +15,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { publishSurvey, closeSurvey, reopenSurvey, getSurveyStats, setAnswerAccess, type SurveyStats, type AnswerAccess } from '../../api/surveys.js';
+import { publishSurvey, closeSurvey, reopenSurvey, getSurveyStats, setAnswerAccess, setDisplayMode, type SurveyStats, type AnswerAccess, type DisplayMode } from '../../api/surveys.js';
 import { ConfirmDialog } from '../../components/ConfirmDialog.js';
 import { answerLink, resolveRuntimeBase } from './publishLink.js';
 import { answerAccessControlMode } from './answerAccessControl.js';
@@ -102,6 +102,24 @@ export function Publish({ id, onGoEdit }: PublishProps) {
     }
   };
 
+  // 切换作答呈现形态(仅 draft 可改)。乐观更新 + 失败回滚,与 onToggleAccess 同构;后端为唯一强制点。
+  const [displayBusy, setDisplayBusy] = useState(false);
+  const onToggleDisplayMode = async () => {
+    if (displayBusy || !stats) return;
+    const next: DisplayMode = stats.displayMode === 'paged' ? 'single' : 'paged';
+    setDisplayBusy(true);
+    setNotice('');
+    try {
+      await setDisplayMode(id, next);
+      setStats({ ...stats, displayMode: next });
+      setNotice(next === 'paged' ? '已设为逐题作答(每题一页)' : '已设为单页作答(全部一页)');
+    } catch {
+      setNotice('切换作答形态失败,请重试');
+    } finally {
+      setDisplayBusy(false);
+    }
+  };
+
   // 确认框「确认」回调:按 confirm 类型执行对应动作,成功后重拉 stats、关框。
   // publish(首发:冻结草稿为 v1 并 live)/ close(暂停)/ reopen(继续:原样恢复上次发布的旧快照)。
   const runConfirmed = async () => {
@@ -163,7 +181,7 @@ export function Publish({ id, onGoEdit }: PublishProps) {
   return (
     <div className="wpad" style={{ padding: 24 }}>
       <div className="publish-grid">
-        {/* 左:渠道 + 回收控制 */}
+        {/* 左:渠道 + 设置(作答形态 + 防刷配额) */}
         <div>
           <div className="card chart-card" style={{ marginBottom: 16 }}>
             <div className="ct">回收渠道</div>
@@ -202,8 +220,8 @@ export function Publish({ id, onGoEdit }: PublishProps) {
           </div>
 
           <div className="card chart-card">
-            <div className="ct">回收控制</div>
-            <div className="cs">防刷与配额,保证样本质量</div>
+            <div className="ct">设置</div>
+            <div className="cs">作答形态与防刷配额,保证样本质量</div>
 
             {/* 作答访问模式。draft 可切;发布后(live/closed)锁定,纯文字回显;new 态无库行不显示。 */}
             {stats && (
@@ -227,6 +245,33 @@ export function Publish({ id, onGoEdit }: PublishProps) {
                   <span>作答访问模式</span>
                   <span style={{ color: 'var(--ink-2)', fontSize: 13 }}>
                     {stats.answerAccess === 'login_required' ? '需登录作答(发布后锁定)' : '匿名作答(发布后锁定)'}
+                  </span>
+                </div>
+              )
+            )}
+
+            {/* 作答呈现形态(逐题/单页)。与访问模式同一 gate:draft 可切;发布后锁定回显;new 不显示。 */}
+            {stats && (
+              answerAccessControlMode(status) === 'editable' ? (
+                <div className="toggle-row">
+                  <div>
+                    <span>逐题作答(每题一页)</span>
+                    <div className="cd" style={{ marginTop: 2 }}>关闭则所有题目在同一页展示</div>
+                  </div>
+                  <div
+                    className={`sw${stats.displayMode === 'paged' ? ' on' : ''}`}
+                    role="switch"
+                    aria-checked={stats.displayMode === 'paged'}
+                    aria-label="逐题作答(每题一页)"
+                    title="仅未发布时可改"
+                    onClick={() => { if (!displayBusy) void onToggleDisplayMode(); }}
+                  />
+                </div>
+              ) : (
+                <div className="toggle-row" style={{ opacity: 0.7 }}>
+                  <span>逐题作答</span>
+                  <span style={{ color: 'var(--ink-2)', fontSize: 13 }}>
+                    {stats.displayMode === 'paged' ? '已开启(发布后锁定)' : '已关闭(发布后锁定)'}
                   </span>
                 </div>
               )

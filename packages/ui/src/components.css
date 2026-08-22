@@ -642,9 +642,20 @@ table.cross tr.total th, table.cross tr.total td, table.cross td.total { backgro
 .fill-col .a-q.invalid { position: relative; }
 .fill-col .a-q.invalid .no { color: var(--critical); }
 .fill-col .a-submit { margin: 34px 0 0; }
-.fill-col .a-submit .btn { width: auto; padding: 14px 30px; }
-.fill-foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 34px; }
-.fill-foot .note { font-size: 12px; color: var(--ink-muted); flex: 1; min-width: 180px; }
+/* 作答页提交按钮放宽到与作答列同宽(满宽),而非内容自适应窄按钮。 */
+.fill-col .a-submit .btn { width: 100%; padding: 14px; }
+/* 竖排:满宽提交按钮在上,校验/错误反馈(note)在下方居中。静态"不可修改"提示已移入提交二次确认弹窗。 */
+.fill-foot { display: flex; flex-direction: column; align-items: stretch; gap: 12px; margin-top: 34px; }
+.fill-foot .a-submit { margin: 0; }
+.fill-foot .note { font-size: 12px; color: var(--ink-muted); text-align: center; }
+/* 逐题作答页脚:竖排——翻页器一行(上一题左 / 下一题右),末题再起一行放满宽提交,note 居中。
+   翻页器始终横排且结构稳定(下一题在末题只禁用不消失),避免按钮位置跳动。 */
+.fill-foot-paged { flex-direction: column; align-items: stretch; gap: 12px; }
+.fill-pager { display: flex; flex-direction: row; align-items: center; gap: 12px; }
+.fill-foot-paged .a-submit { margin: 0; }
+.fill-foot-paged .a-submit .btn { width: 100%; padding: 14px; }
+/* 禁用态的下一题:降透明,明确不可点(区别于可点的主按钮)。 */
+.fill-pager .btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* 窄屏作答路径:浮动按钮 + 抽屉。桌面(>960px)不显示,双栏侧栏已常驻。 */
 .fill-rail-fab { display: none; }
