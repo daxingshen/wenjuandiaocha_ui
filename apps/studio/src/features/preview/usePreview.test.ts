@@ -16,15 +16,23 @@ const schema: SurveySchema = {
 
 describe('previewReducer', () => {
   it('setAnswer 更新答案并清错误/回执', () => {
-    const s = previewReducer({ answers: {}, errors: [{ qid: 'q1', message: 'x' }], submitted: 'blocked' }, { type: 'setAnswer', qid: 'q1', value: 'a' });
+    const s = previewReducer({ answers: {}, errors: [{ qid: 'q1', message: 'x' }], submitted: 'blocked', curId: null }, { type: 'setAnswer', qid: 'q1', value: 'a' });
     expect(s.answers).toEqual({ q1: 'a' });
     expect(s.errors).toEqual([]);
     expect(s.submitted).toBe('none');
   });
 
-  it('reset 清空', () => {
-    const s = previewReducer({ answers: { q1: 'a' }, errors: [], submitted: 'ok' }, { type: 'reset' });
+  it('setCurrent 切换当前题(逐题预览翻页),不动答案/错误', () => {
+    const s = previewReducer({ answers: { q1: 'a' }, errors: [{ qid: 'q2', message: 'x' }], submitted: 'blocked', curId: 'q1' }, { type: 'setCurrent', qid: 'q2' });
+    expect(s.curId).toBe('q2');
+    expect(s.answers).toEqual({ q1: 'a' }); // 翻页不改答案
+    expect(s.errors).toEqual([{ qid: 'q2', message: 'x' }]); // 翻页不清错误
+  });
+
+  it('reset 清空(含 curId)', () => {
+    const s = previewReducer({ answers: { q1: 'a' }, errors: [], submitted: 'ok', curId: 'q2' }, { type: 'reset' });
     expect(s).toEqual(initialPreviewState);
+    expect(s.curId).toBeNull();
   });
 });
 

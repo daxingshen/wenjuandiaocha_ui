@@ -10,11 +10,12 @@
  * 冒险点(原型 §4.5):被逻辑隐藏的题不从路径里消失,而是连同「因 Qx 跳过」原因留在时间线里,
  * 消除「题目忽隐忽现」的迷失感。完成度只算可见题。
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { evaluate, validateSurvey, type SurveySchema } from '@xingjuan/engine';
 import { getAnswer } from '@xingjuan/question-types';
-import { ApiError, type SubmitFn } from '../api/client.js';
+import { ApiError, type DisplayMode, type SubmitFn } from '../api/client.js';
 import { buildPath, isAnswered } from '../fillPath.js';
+import { initialCursorId, pickCurrent } from '../pickCurrent.js';
 import type { FillAction, FillState } from '../useFill.js';
 
 /** 已登录作答者的头部信息(login_required 路径注入):显示账号 + 提供退出换账号。 */
@@ -25,12 +26,15 @@ export interface FillAuth {
 
 export function Fill({
   schema,
+  displayMode,
   state,
   dispatch,
   submit,
   auth,
 }: {
   schema: SurveySchema;
+  /** 作答呈现形态:'paged' 逐题一页(每屏一题 + 上/下一题),'single'(默认)全部一页。 */
+  displayMode: DisplayMode;
   state: FillState;
   dispatch: React.Dispatch<FillAction>;
   /** 提交函数(方案A·D2):anonymous 注入匿名版,login_required 注入鉴权版。Fill 不感知登录。 */
@@ -38,7 +42,8 @@ export function Fill({
   /** 已登录时的头部信息(仅 login_required 路径传入);anonymous 路径为 undefined。 */
   auth?: FillAuth;
 }) {
-  const { answers, errors, submitting, submitError, triedSubmit } = state;
+  const { answers, curId, errors, submitting, submitError, triedSubmit } = state;
+  const paged = displayMode === 'paged';
   // 隐藏题是 answers 的纯派生;每次作答后重算(约束 3:逻辑求值器统一执行)
   const { hidden } = useMemo(() => evaluate(schema.rules, answers), [schema.rules, answers]);
   const errorOf = (qid: string) => errors.find((e) => e.qid === qid)?.message;
@@ -54,13 +59,37 @@ export function Fill({
   // 路径栏时间线(纯派生,已抽到 fillPath.ts 便于单测):含隐藏题,skip 带源题序号。
   const nodes = useMemo(() => buildPath(schema, answers, hidden, tried), [schema, answers, hidden, tried]);
 
+  // 逐题模式:当前题**只由持久化指针 curId 决定**,不随作答重算——否则勾选当前题即被判"已答"、
+  // 当前题就滑到下一题(真机缺陷)。curId 指向的题若被逻辑隐藏,pickCurrent 借原题序就近回退。
+  // curId 为 null(初次进入/旧数据无指针)时先渲染"首个未答题"占位,同时由下方 useEffect 一次性
+  // 把指针锚定到 state;锚定后前进只发生在点「下一题/上一题/跳题」。单页模式下 cur 恒 null。
+  const orderIds = useMemo(() => schema.questions.map((q) => q.id), [schema]);
+  const cur = paged ? pickCurrent(visible, curId ?? initialCursorId(visible, answers), orderIds) : null;
+  const curIdx = cur ? visible.findIndex((q) => q.id === cur.id) : -1;
+  const isFirstVisible = curIdx <= 0;
+  const isLastVisible = curIdx === visible.length - 1;
+
+  // 进入逐题模式且无持久指针时,把当前题一次性锚定到 state(首个未答→首个可见)。
+  // 锚定后 curId 不再为 null,cur 纯由 curId 驱动,勾选当前题不再触发跳题。
+  // 依赖 cur?.id:仅在"该渲染哪题"已定且 state 尚未落指针时落一次,不会来回抖动。
+  useEffect(() => {
+    if (paged && curId == null && cur) dispatch({ type: 'setCurrent', qid: cur.id });
+  }, [paged, curId, cur, dispatch]);
+
   // 窄屏(≤960px)作答路径抽屉开合。桌面双栏常驻侧栏,不用此态。
   const [railOpen, setRailOpen] = useState(false);
   // 提交失败弹窗:非校验类失败(无权限/会话失效/网络/服务端)用弹窗明确告知,而非仅底部小字。
   // 校验类失败仍走逐题红 + 滚动,不弹窗(那是"补填"而非"出错")。
   const [failModal, setFailModal] = useState<{ title: string; body: string } | null>(null);
+  // 提交二次确认:本地校验通过后先弹确认框(告知"提交后不可修改"),确认才真正提交。
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
 
+  // 单页模式:滚到目标题。逐题模式:目标题不在当前屏,改为切换当前题(setCurrent),再由渲染切页。
   const jump = (qid: string) => {
+    if (paged) {
+      if (!hidden.has(qid)) dispatch({ type: 'setCurrent', qid });
+      return;
+    }
     document.getElementById(`q-${qid}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
@@ -103,16 +132,22 @@ export function Fill({
     </>
   );
 
-  const onSubmit = async () => {
+  // 点提交:本地校验(仅即时反馈,后端会权威重跑,决策 6)。通过则弹二次确认,不直接提交。
+  const onSubmit = () => {
     if (submitting) return; // 防重复提交
-    // 本地校验仅为即时反馈;后端会权威重跑(决策 6)
     const errs = validateSurvey(schema, answers);
     if (errs.length > 0) {
       dispatch({ type: 'showErrors', errors: errs });
       jump(errs[0]!.qid);
       return;
     }
-    // 提交是权威落库的唯一凭据:必须等后端 200 才算成功,失败留在本页可重试(答案不清盘)
+    setConfirmSubmit(true);
+  };
+
+  // 二次确认后真正提交(权威落库的唯一凭据:必须等后端 200 才算成功,失败留在本页可重试,答案不清盘)。
+  const doSubmit = async () => {
+    setConfirmSubmit(false);
+    if (submitting) return;
     dispatch({ type: 'submitStart' });
     try {
       const { rows } = await submit(schema.id, schema.version, answers);
@@ -145,7 +180,51 @@ export function Fill({
     }
   };
 
+  // 逐题「下一题」:先校验当前题(复用 validateSurvey,过滤到当前 qid),不通过则亮该题红、不前进;
+  // 通过则切到下一可见题。最后一题的「下一题」由按钮换成「提交问卷」走 onSubmit,不进此函数。
+  const goNext = () => {
+    if (submitting || !cur) return;
+    const errs = validateSurvey(schema, answers).filter((e) => e.qid === cur.id);
+    if (errs.length > 0) {
+      dispatch({ type: 'showErrors', errors: errs });
+      return;
+    }
+    const next = visible[curIdx + 1];
+    if (next) dispatch({ type: 'setCurrent', qid: next.id });
+  };
+
+  // 逐题「上一题」:回到上一可见题,已填值保留(不校验、不清答案)。首题时按钮隐藏,不会走到这。
+  const goPrev = () => {
+    if (submitting) return;
+    const prev = visible[curIdx - 1];
+    if (prev) dispatch({ type: 'setCurrent', qid: prev.id });
+  };
+
   const missCount = tried ? visible.filter((q) => q.required && !isAnswered(answers[q.id])).length : 0;
+
+  // 单题块渲染(单页/逐题共用):i 为可见序号,用于 Q{i+1} 编号(沿用原单页口径,行为不变)。
+  const renderQuestion = (q: (typeof visible)[number], i: number) => {
+    const Answer = getAnswer(q.type);
+    const err = errorOf(q.id);
+    // 必答红 = 已尝试提交 && 必答 && 当前仍未答(live,与路径栏 miss 同源;
+    // 编辑补填后即时消红,不依赖会被 setAnswer 清空的 errors 数组)。
+    const invalid = (tried && q.required && !isAnswered(answers[q.id])) || !!err;
+    return (
+      <div key={q.id} id={`q-${q.id}`} className={`a-q${invalid ? ' invalid' : ''}`}>
+        <div className="qt">
+          {q.required && <span className="req">* </span>}
+          <span className="no">Q{i + 1}</span> {q.title}
+        </div>
+        {q.hint && <div className="q-hint">{q.hint}</div>}
+        {Answer ? (
+          <Answer question={q} value={answers[q.id]} onChange={(v) => { if (!submitting) dispatch({ type: 'setAnswer', qid: q.id, value: v }); }} />
+        ) : (
+          <p style={{ color: 'var(--critical)' }}>未知题型:{q.type}</p>
+        )}
+        {err && <p style={{ color: 'var(--critical)', fontSize: 12, marginTop: 8 }}>{err}</p>}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -186,44 +265,52 @@ export function Fill({
           {/* 提交进行中锁住作答区:防止 onSubmit 已捕获 answers 快照后,用户再改动导致
               "改动进了 localStorage 但没进本次提交,成功后又被清盘"的静默丢失(⑥ 复核 defect 1)。 */}
           <div className="a-body" style={submitting ? { pointerEvents: 'none', opacity: 0.6 } : undefined} aria-busy={submitting}>
-            {visible.map((q, i) => {
-              const Answer = getAnswer(q.type);
-              const err = errorOf(q.id);
-              // 必答红 = 已尝试提交 && 必答 && 当前仍未答(live,与路径栏 miss 同源;
-              // 编辑补填后即时消红,不依赖会被 setAnswer 清空的 errors 数组)。
-              const invalid = (tried && q.required && !isAnswered(answers[q.id])) || !!err;
-              return (
-                <div key={q.id} id={`q-${q.id}`} className={`a-q${invalid ? ' invalid' : ''}`}>
-                  <div className="qt">
-                    {q.required && <span className="req">* </span>}
-                    <span className="no">Q{i + 1}</span> {q.title}
-                  </div>
-                  {q.hint && <div className="q-hint">{q.hint}</div>}
-                  {Answer ? (
-                    <Answer question={q} value={answers[q.id]} onChange={(v) => { if (!submitting) dispatch({ type: 'setAnswer', qid: q.id, value: v }); }} />
-                  ) : (
-                    <p style={{ color: 'var(--critical)' }}>未知题型:{q.type}</p>
-                  )}
-                  {err && <p style={{ color: 'var(--critical)', fontSize: 12, marginTop: 8 }}>{err}</p>}
-                </div>
-              );
-            })}
+            {/* 单页(single,默认):渲染全部可见题;逐题(paged):只渲染当前题 cur。
+                两条路径共用同一题块渲染(renderQuestion),保证单页行为零变化。 */}
+            {paged
+              ? cur && renderQuestion(cur, curIdx)
+              : visible.map((q, i) => renderQuestion(q, i))}
           </div>
 
-          <div className="fill-foot">
-            <div className="a-submit" style={{ flex: 'none' }}>
-              <button type="button" className="btn primary" onClick={() => void onSubmit()} disabled={submitting}>
-                {submitting ? '提交中…' : '提交问卷'}
-              </button>
+          {paged ? (
+            // 逐题页脚:翻页器(上一题[首题隐藏] / 下一题[末题禁用不消失,保持翻页器稳定])一行,
+            // 末题再单起一行给与列等宽的「提交问卷」——提交是独立动作,不并进翻页器。
+            <div className="fill-foot fill-foot-paged">
+              <div className="fill-pager">
+                {!isFirstVisible && (
+                  <button type="button" className="btn" onClick={goPrev} disabled={submitting}>← 上一题</button>
+                )}
+                <div className="sp" style={{ flex: 1 }} />
+                <button type="button" className="btn primary" onClick={goNext} disabled={submitting || isLastVisible}>下一题 →</button>
+              </div>
+              {isLastVisible && (
+                <div className="a-submit">
+                  <button type="button" className="btn primary" onClick={() => void onSubmit()} disabled={submitting}>
+                    {submitting ? '提交中…' : '提交问卷'}
+                  </button>
+                </div>
+              )}
+              {(submitError || missCount > 0) && (
+                <span className="note" role="alert">
+                  {submitError ? submitError : `还有 ${missCount} 道必答题待完成`}
+                </span>
+              )}
             </div>
-            <span className="note" role={submitError || missCount > 0 ? 'alert' : undefined}>
-              {submitError
-                ? submitError
-                : missCount > 0
-                  ? `还有 ${missCount} 道必答题待完成`
-                  : '提交后不可修改;答案已本地暂存,可随时回来续答。'}
-            </span>
-          </div>
+          ) : (
+            <div className="fill-foot">
+              <div className="a-submit" style={{ flex: 'none' }}>
+                <button type="button" className="btn primary" onClick={() => void onSubmit()} disabled={submitting}>
+                  {submitting ? '提交中…' : '提交问卷'}
+                </button>
+              </div>
+              {/* 静态"提交后不可修改"提示已移入提交二次确认弹窗;此处只在有校验/提交错误时显示红字反馈。 */}
+              {(submitError || missCount > 0) && (
+                <span className="note" role="alert">
+                  {submitError ? submitError : `还有 ${missCount} 道必答题待完成`}
+                </span>
+              )}
+            </div>
+          )}
         </main>
       </div>
 
@@ -252,6 +339,20 @@ export function Fill({
               setRailOpen(false);
             })}
           </aside>
+        </div>
+      )}
+
+      {/* 提交二次确认弹窗:本地校验已过,确认后才真正提交。告知"提交后不可修改"。 */}
+      {confirmSubmit && (
+        <div className="modal-mask" role="dialog" aria-modal="true" aria-label="确认提交" onClick={() => setConfirmSubmit(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">确认提交?</div>
+            <div className="modal-body">提交后不可修改。你的答案已本地暂存,可随时回来续答。</div>
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={() => setConfirmSubmit(false)}>再检查一下</button>
+              <button type="button" className="btn primary" onClick={() => void doSubmit()}>确认提交</button>
+            </div>
+          </div>
         </div>
       )}
 

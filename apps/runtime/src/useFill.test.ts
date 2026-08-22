@@ -4,7 +4,7 @@
  * showErrors 退出提交中;done/reset 才清盘。回归防护:setAnswer 清掉上次提交错误。
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { makeReducer, sweepStaleVersions, type FillState } from './useFill.js';
+import { makeReducer, makeInitialState, sweepStaleVersions, type FillState } from './useFill.js';
 
 const reducer = makeReducer('sid-test', 1);
 const KEY = 'xingjuan:answers:sid-test:v1';
@@ -25,6 +25,7 @@ vi.stubGlobal('localStorage', {
 
 const base = (over: Partial<FillState> = {}): FillState => ({
   answers: {},
+  curId: null,
   phase: 'fill',
   errors: [],
   triedSubmit: false,
@@ -115,6 +116,54 @@ describe('版本隔离(版本锚定)', () => {
     v2(base(), { type: 'setAnswer', qid: 'q1', value: 'b' });
     expect(localStorage.getItem('xingjuan:answers:sid-x:v2')).toBe(JSON.stringify({ q1: 'b' }));
     expect(localStorage.getItem('xingjuan:answers:sid-x:v1')).toBe(JSON.stringify({ q1: 'a' }));
+  });
+});
+
+describe('逐题指针持久化(setCurrent / 独立 cursor key)', () => {
+  const CURSOR_KEY = 'xingjuan:cursor:sid-test:v1';
+
+  it('setCurrent 落盘当前题 id 到独立 cursor key,并置 state.curId', () => {
+    const s = reducer(base(), { type: 'setCurrent', qid: 'q3' });
+    expect(s.curId).toBe('q3');
+    expect(localStorage.getItem(CURSOR_KEY)).toBe(JSON.stringify('q3'));
+    // 不误写 answers key
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('done 清盘同时清掉 cursor key,并复位 curId', () => {
+    localStorage.setItem(KEY, JSON.stringify({ q1: 'a' }));
+    localStorage.setItem(CURSOR_KEY, JSON.stringify('q2'));
+    const s = reducer(base({ curId: 'q2', answers: { q1: 'a' } }), { type: 'done', rows: 1 });
+    expect(s.curId).toBeNull();
+    expect(localStorage.getItem(CURSOR_KEY)).toBeNull();
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('reset 清掉 cursor key 并复位 curId', () => {
+    localStorage.setItem(CURSOR_KEY, JSON.stringify('q2'));
+    const s = reducer(base({ curId: 'q2' }), { type: 'reset' });
+    expect(s.curId).toBeNull();
+    expect(localStorage.getItem(CURSOR_KEY)).toBeNull();
+  });
+
+  it('setAnswer 不动 cursor(改答案不改当前题指针)', () => {
+    localStorage.setItem(CURSOR_KEY, JSON.stringify('q2'));
+    const s = reducer(base({ curId: 'q2' }), { type: 'setAnswer', qid: 'q2', value: 'x' });
+    expect(s.curId).toBe('q2');
+    expect(localStorage.getItem(CURSOR_KEY)).toBe(JSON.stringify('q2'));
+  });
+
+  it('useFill 惰性初始化:有 cursor key → 恢复 curId;仅有 answers 的旧数据 → curId 回落 null(不抛)', () => {
+    // 旧数据:只有 answers key、无 cursor key。恢复不该抛,curId 应为 null(组件据此回落首个未答题)。
+    localStorage.setItem(KEY, JSON.stringify({ q1: 'a' }));
+    const oldState = makeInitialState('sid-test', 1);
+    expect(oldState.answers).toEqual({ q1: 'a' });
+    expect(oldState.curId).toBeNull();
+
+    // 新数据:有 cursor key → 恢复到该题。
+    localStorage.setItem(CURSOR_KEY, JSON.stringify('q2'));
+    const newState = makeInitialState('sid-test', 1);
+    expect(newState.curId).toBe('q2');
   });
 });
 

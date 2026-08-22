@@ -102,15 +102,20 @@ async function take<T>(res: Response, netMsg: string): Promise<T> {
 /** 作答访问模式(对齐后端 domain.AnswerAccess)。anonymous=免登录;login_required=需登录作答。 */
 export type AnswerAccess = 'anonymous' | 'login_required';
 
-/** 公开加载响应:已发布快照 + 作答访问模式。answerAccess 让前端加载即知走匿名/登录路径。 */
+/** 作答呈现形态(对齐后端 domain.DisplayMode)。paged=逐题一页;single=全部一页(默认)。 */
+export type DisplayMode = 'paged' | 'single';
+
+/** 公开加载响应:已发布快照 + 作答访问模式 + 呈现形态。让前端加载即知走匿名/登录、单页/逐题。 */
 export interface PublicSurvey {
   schema: SurveySchema;
   answerAccess: AnswerAccess;
+  displayMode: DisplayMode;
 }
 
 /**
  * 按发布 id 拉取已发布快照 + 作答模式(公开只读)。失败抛 ApiError(notFound=不存在/未发布/已结束)。
- * 后端返回 { schema, answerAccess };answerAccess 缺省/未知值按 anonymous 处理(兼容旧后端/历史数据)。
+ * 后端返回 { schema, answerAccess, displayMode };缺省/未知值:answerAccess 按 anonymous、
+ * displayMode 按 single 处理(兼容旧后端/历史数据,保证既有单页作答零行为变化)。
  */
 export async function fetchSurvey(id: string): Promise<PublicSurvey> {
   let res: Response;
@@ -119,9 +124,10 @@ export async function fetchSurvey(id: string): Promise<PublicSurvey> {
   } catch {
     throw new ApiError(0, '网络异常,无法加载问卷');
   }
-  const data = await take<{ schema: SurveySchema; answerAccess?: string }>(res, '加载失败,请稍后重试');
+  const data = await take<{ schema: SurveySchema; answerAccess?: string; displayMode?: string }>(res, '加载失败,请稍后重试');
   const answerAccess: AnswerAccess = data.answerAccess === 'login_required' ? 'login_required' : 'anonymous';
-  return { schema: data.schema, answerAccess };
+  const displayMode: DisplayMode = data.displayMode === 'paged' ? 'paged' : 'single';
+  return { schema: data.schema, answerAccess, displayMode };
 }
 
 /** 提交函数签名。App 按 answerAccess 注入匿名版或鉴权版,Fill 只调它、不感知登录(方案A·D2)。 */

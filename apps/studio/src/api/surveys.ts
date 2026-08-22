@@ -17,6 +17,9 @@ export interface SurveyListItem {
 /** 作答访问模式(对齐后端 domain.AnswerAccess)。 */
 export type AnswerAccess = 'anonymous' | 'login_required';
 
+/** 作答呈现形态(对齐后端 domain.DisplayMode)。paged 逐题一页 / single 全部一页(默认)。 */
+export type DisplayMode = 'paged' | 'single';
+
 /** 单卷发布态统计(发布回收页用)。回收量来自 responses 计数。 */
 export interface SurveyStats {
   /** draft|live|closed */
@@ -27,6 +30,8 @@ export interface SurveyStats {
   responseCount: number;
   /** 作答访问模式:anonymous 免登录 / login_required 需登录(发布页回显与切换)。 */
   answerAccess: AnswerAccess;
+  /** 作答呈现形态:paged 逐题一页 / single 全部一页(发布页回显与切换)。 */
+  displayMode: DisplayMode;
 }
 
 import { apiGet, apiSend } from './client.js';
@@ -114,4 +119,12 @@ export async function getSurveyStats(id: string): Promise<SurveyStats> {
  */
 export async function setAnswerAccess(id: string, answerAccess: AnswerAccess): Promise<void> {
   await apiSend<null>(`/surveys/${id}/answer-access`, 'PATCH', { answerAccess });
+}
+
+/**
+ * 设作答呈现形态(仅 draft 可改)。后端守卫同 answer-access:非 draft → 409,非 owner → 404,非法值 → 400。
+ * 与作答访问模式并列,发布前定好;发布后锁定。
+ */
+export async function setDisplayMode(id: string, displayMode: DisplayMode): Promise<void> {
+  await apiSend<null>(`/surveys/${id}/display-mode`, 'PATCH', { displayMode });
 }
