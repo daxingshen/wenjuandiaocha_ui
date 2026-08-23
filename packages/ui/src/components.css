@@ -134,6 +134,12 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 
 /* 列表行「编辑设计」下拉:复用头像菜单的浮层语汇(am-item),行内锚定向下展开。 */
 .row-menu { position: relative; }
+.srow .ops .btn-ic { vertical-align: middle; margin-right: 5px; }
+.srow .ops .btn-ic.edit { color: var(--brand); }
+.srow .ops .btn-ic.share { color: var(--s3); }
+.srow .ops .btn-ic.chart { color: var(--s7); }
+.row-menu .caret { margin-left: 3px; vertical-align: middle; color: var(--ink-muted); transition: transform .15s; }
+.row-menu .caret.open { color: var(--brand); transform: rotate(180deg); }
 .row-menu-pop { position: absolute; top: calc(100% + 6px); left: 0; min-width: 148px; background: var(--surface);
   border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 6px; z-index: 40; }
 .row-menu-pop .am-item { display: block; width: 100%; text-align: left; padding: 8px 10px; border: none; border-radius: 7px;

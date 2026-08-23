@@ -9,6 +9,34 @@ import { ConfirmDialog } from '../../components/ConfirmDialog.js';
 import { listSurveys, copySurvey, type SurveyListItem } from '../../api/surveys.js';
 import { canEditSurvey } from './editGate.js';
 
+/** 行内线性图标(继承 currentColor,可由 className 上色)。paths 为 SVG path 的 d 值数组。 */
+const ICON_PATHS: Record<string, string[]> = {
+  edit: ['M12 20h9', 'M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'],
+  share: ['M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7', 'M16 6l-4-4-4 4', 'M12 2v13'],
+  chart: ['M3 3v18h18', 'M8 15v3', 'M13 10v8', 'M18 6v12'],
+  caret: ['M6 9l6 6 6-6'],
+};
+function Icon({ name, className }: { name: keyof typeof ICON_PATHS; className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {(ICON_PATHS[name] ?? []).map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
+}
+
 /** 类型 → 色板槽位 + 图标(对照原型 typeMeta / 类型色映射 UI 文档 §2.1)。 */
 const TYPE_META: Record<string, { color: string; ic: string; label: string }> = {
   survey: { color: 'var(--s1)', ic: '问', label: '问卷' },
@@ -325,7 +353,9 @@ export function Dashboard() {
                           aria-expanded={openMenuId === s.id}
                           onClick={() => setOpenMenuId((cur) => (cur === s.id ? null : s.id))}
                         >
-                          ✏️ 编辑 ▾
+                          <Icon name="edit" className="btn-ic edit" />
+                          编辑
+                          <Icon name="caret" className={`caret${openMenuId === s.id ? ' open' : ''}`} />
                         </button>
                         {openMenuId === s.id && (
                           <nav className="row-menu-pop" role="menu">
@@ -344,8 +374,12 @@ export function Dashboard() {
                         )}
                       </div>
                       {/* 发布/暂停/继续等生命周期动作集中在发布页(发送分享),看板列表只做导航。 */}
-                      <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/publish`)}>📤 发送分享</button>
-                      <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/analyze`)}>📊 分析下载</button>
+                      <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/publish`)}>
+                        <Icon name="share" className="btn-ic share" /> 发送分享
+                      </button>
+                      <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/analyze`)}>
+                        <Icon name="chart" className="btn-ic chart" /> 分析下载
+                      </button>
                       <div className="spring" />
                       <button className="btn sm ghost" title="更多">⋯</button>
                     </div>
