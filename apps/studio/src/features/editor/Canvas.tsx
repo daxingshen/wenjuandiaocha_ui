@@ -8,12 +8,14 @@
  */
 import { useEffect, useRef } from 'react';
 import { getAnswer, getEditor, getCanvasEditor } from '@xingjuan/question-types';
+import { WelcomeEditor, isWelcomeHtmlEmpty } from '@xingjuan/ui/welcome';
 import { useEditorStore } from './useEditorStore.js';
 
 export function Canvas() {
   const schema = useEditorStore((s) => s.schema);
   const selectedQid = useEditorStore((s) => s.selectedQid);
   const setTitle = useEditorStore((s) => s.setTitle);
+  const setWelcome = useEditorStore((s) => s.setWelcome);
   const selectQuestion = useEditorStore((s) => s.selectQuestion);
   const moveQuestion = useEditorStore((s) => s.moveQuestion);
   const removeQuestion = useEditorStore((s) => s.removeQuestion);
@@ -35,13 +37,20 @@ export function Canvas() {
 
   return (
     <div className="paper">
-      <div className="paper-head">
+      {/* 问卷标题 + 欢迎页同处一个容器:标题水平居中,其下常驻欢迎页编辑区。
+          不套 .paper-head 卡片壳(无边框/顶栏/阴影),直接展示。
+          空内容(Quill 空文档 <p><br></p>)→ setWelcome(undefined) 清字段,向后兼容。 */}
+      <div className="paper-cover">
         <input
           className="paper-title-in"
           value={schema.title}
           placeholder="未命名问卷"
           aria-label="问卷标题"
           onChange={(e) => setTitle(e.target.value)}
+        />
+        <WelcomeEditor
+          value={schema.welcome}
+          onChange={(next) => setWelcome(isWelcomeHtmlEmpty(next.html) ? undefined : next)}
         />
       </div>
 

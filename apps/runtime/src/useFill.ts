@@ -9,8 +9,8 @@ import { useReducer } from 'react';
 import type { Answers } from '@xingjuan/engine';
 import type { ValidationError } from '@xingjuan/engine';
 
-/** 作答阶段:填写中 / 已提交。 */
-export type Phase = 'fill' | 'done';
+/** 作答阶段:欢迎页 / 填写中 / 已提交。welcome 是作答路径第 0 站(总显,即便无欢迎内容)。 */
+export type Phase = 'welcome' | 'fill' | 'done';
 
 export interface FillState {
   answers: Answers;
@@ -37,6 +37,7 @@ export interface FillState {
 }
 
 export type FillAction =
+  | { type: 'start' }
   | { type: 'setAnswer'; qid: string; value: unknown }
   | { type: 'setCurrent'; qid: string }
   | { type: 'showErrors'; errors: ValidationError[] }
@@ -52,6 +53,9 @@ const storageKey = (surveyId: string, version: number) => `xingjuan:answers:${su
 // 逐题指针存独立 key(与 answers 解耦):旧数据只有 answers key、无此 key,load 读到 null 即回落,
 // 不抛错、不改变既有单页续答行为(向后兼容)。
 const cursorKey = (surveyId: string, version: number) => `xingjuan:cursor:${surveyId}:v${version}`;
+// 「已开始作答」标记(版本锚定):点过欢迎页「开始作答」后置位,刷新/断点续答直接回作答页,不重看欢迎页。
+// 与 cursor 同为独立 key:旧数据无此 key,load 读到无标记→仍先过欢迎页(向后兼容,总显欢迎页)。
+const startedKey = (surveyId: string, version: number) => `xingjuan:started:${surveyId}:v${version}`;
 
 /** 从 localStorage 读断点续答的答案;失败(隐私模式/损坏)则空。 */
 function loadAnswers(surveyId: string, version: number): Answers {
@@ -81,6 +85,23 @@ function saveCursor(surveyId: string, version: number, qid: string): void {
   }
 }
 
+/** 读「已开始」标记(版本锚定)。无(旧数据/首次进入)或失败则 false → 先过欢迎页。 */
+function loadStarted(surveyId: string, version: number): boolean {
+  try {
+    return localStorage.getItem(startedKey(surveyId, version)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveStarted(surveyId: string, version: number): void {
+  try {
+    localStorage.setItem(startedKey(surveyId, version), '1');
+  } catch {
+    // 隐私模式/超限:静默失败,不阻断作答
+  }
+}
+
 function saveAnswers(surveyId: string, version: number, answers: Answers): void {
   try {
     localStorage.setItem(storageKey(surveyId, version), JSON.stringify(answers));
@@ -93,6 +114,7 @@ function clearAnswers(surveyId: string, version: number): void {
   try {
     localStorage.removeItem(storageKey(surveyId, version));
     localStorage.removeItem(cursorKey(surveyId, version)); // 指针随答案一并清(提交完成/重置)
+    localStorage.removeItem(startedKey(surveyId, version)); // 「已开始」标记一并清:重置后回到欢迎页
   } catch {
     /* 忽略 */
   }
@@ -104,11 +126,13 @@ function clearAnswers(surveyId: string, version: number): void {
 // 仅按精确前缀 `xingjuan:answers:${id}:v` 匹配:id 是定长 8 位 base32,前缀无歧义,不会误删他卷。
 export function sweepStaleVersions(surveyId: string, keepVersion: number): void {
   try {
-    // answers 与 cursor 两族 key 都要清:非当前版的都是换版遗留孤儿(含逐题指针)。
+    // answers / cursor / started 三族 key 都要清:非当前版的都是换版遗留孤儿。
     const answersPrefix = `xingjuan:answers:${surveyId}:v`;
     const cursorPrefix = `xingjuan:cursor:${surveyId}:v`;
+    const startedPrefix = `xingjuan:started:${surveyId}:v`;
     const keepAnswers = storageKey(surveyId, keepVersion);
     const keepCursor = cursorKey(surveyId, keepVersion);
+    const keepStarted = startedKey(surveyId, keepVersion);
     // 先收集再删:removeItem 会改变 localStorage.length/索引,不能边遍历边删。
     const stale: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -116,6 +140,7 @@ export function sweepStaleVersions(surveyId: string, keepVersion: number): void 
       if (!k) continue;
       if (k !== keepAnswers && k.startsWith(answersPrefix)) stale.push(k);
       else if (k !== keepCursor && k.startsWith(cursorPrefix)) stale.push(k);
+      else if (k !== keepStarted && k.startsWith(startedPrefix)) stale.push(k);
     }
     stale.forEach((k) => localStorage.removeItem(k));
   } catch {
@@ -127,6 +152,10 @@ export function sweepStaleVersions(surveyId: string, keepVersion: number): void 
 export function makeReducer(surveyId: string, version: number) {
   return function reducer(state: FillState, action: FillAction): FillState {
     switch (action.type) {
+      case 'start':
+        // 点欢迎页「开始作答」:落「已开始」标记(版本锚定),进作答页。再刷新直接回作答页不重看欢迎。
+        saveStarted(surveyId, version);
+        return { ...state, phase: 'fill' };
       case 'setAnswer': {
         const answers = { ...state.answers, [action.qid]: action.value };
         saveAnswers(surveyId, version, answers);
@@ -152,7 +181,8 @@ export function makeReducer(surveyId: string, version: number) {
         return { ...state, phase: 'done', curId: null, errors: [], submitting: false, submitError: null, triedSubmit: false, submittedRows: action.rows };
       case 'reset':
         clearAnswers(surveyId, version);
-        return { answers: {}, curId: null, phase: 'fill', errors: [], triedSubmit: false, submitting: false, submitError: null, submittedRows: 0 };
+        // 重置回到欢迎页(清了「已开始」标记,重新走第 0 站)。
+        return { answers: {}, curId: null, phase: 'welcome', errors: [], triedSubmit: false, submitting: false, submitError: null, submittedRows: 0 };
       default:
         return state;
     }
@@ -170,7 +200,8 @@ export function makeInitialState(surveyId: string, version: number): FillState {
     answers: loadAnswers(surveyId, version),
     // 逐题指针从独立 key 恢复(旧数据无此 key → null,组件回落首个未答题)。
     curId: loadCursor(surveyId, version),
-    phase: 'fill',
+    // 初始相位:已点过「开始作答」→ 直接作答页;否则先过欢迎页(总显,第 0 站)。
+    phase: loadStarted(surveyId, version) ? 'fill' : 'welcome',
     errors: [],
     triedSubmit: false,
     submitting: false,

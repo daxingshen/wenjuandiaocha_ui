@@ -107,6 +107,8 @@ export function Preview() {
         <DeviceFrame device={device} url={`星卷 · survey/${schema.id}`}>
           <div className="a-hero">
             <h2>{schema.title}</h2>
+            {/* 预览的作答模拟对齐真机 Fill 页:顶部只展示标题,不渲染欢迎内容
+                (欢迎内容属作答端第 0 屏欢迎页,不属作答页本身)。 */}
             <p>感谢参与 · 匿名填写</p>
             <div className="a-prog"><i style={{ width: `${derived.pct}%` }} /></div>
             <p style={{ marginTop: 8 }}>已答 {derived.answeredCount} / {derived.requiredTotal} 题</p>
