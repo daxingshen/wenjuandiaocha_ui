@@ -5,11 +5,11 @@ describe('answerAccessControlMode', () => {
   it('draft:可切换开关', () => {
     expect(answerAccessControlMode('draft')).toBe('editable');
   });
-  it('live:只读回显(发布后锁定)', () => {
-    expect(answerAccessControlMode('live')).toBe('readonly');
+  it('live:可切换开关(发布后放开)', () => {
+    expect(answerAccessControlMode('live')).toBe('editable');
   });
-  it('closed:只读回显', () => {
-    expect(answerAccessControlMode('closed')).toBe('readonly');
+  it('closed:可切换开关(发布后放开)', () => {
+    expect(answerAccessControlMode('closed')).toBe('editable');
   });
   it('new:不显示控件(无库行可 PATCH)', () => {
     expect(answerAccessControlMode('new')).toBe('hidden');
