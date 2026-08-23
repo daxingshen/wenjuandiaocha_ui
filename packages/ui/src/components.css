@@ -112,9 +112,11 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .pager .pg-btn.on { background: var(--brand-weak); border-color: var(--brand); color: var(--brand); font-weight: 600; }
 .pager .pg-btn:disabled { opacity: .45; cursor: default; }
 .pager .pg-gap { padding: 0 2px; color: var(--ink-muted); }
-.srow { display: flex; align-items: stretch; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; transition: .15s; }
+/* 不用 overflow:hidden 裁圆角(会连带裁掉行内「编辑设计」下拉浮层);
+   改由色条自身圆左角 + 卡片圆角保持外观。 */
+.srow { display: flex; align-items: stretch; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); transition: .15s; }
 .srow:hover { box-shadow: var(--shadow); }
-.srow .stripe { width: 5px; flex: none; }
+.srow .stripe { width: 5px; flex: none; border-radius: var(--radius) 0 0 var(--radius); }
 .srow .body { flex: 1; min-width: 0; padding: 16px 20px; }
 .srow .top { display: flex; align-items: center; gap: 14px; }
 .srow .type-ic { width: 42px; height: 42px; border-radius: 10px; display: grid; place-items: center; color: #fff; font-size: 16px; font-weight: 700; flex: none; }
@@ -129,6 +131,15 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .srow .stat .lab { font-size: 11.5px; color: var(--ink-muted); margin-top: 2px; }
 .srow .ops { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line-soft); }
 .srow .ops .spring { flex: 1; }
+
+/* 列表行「编辑设计」下拉:复用头像菜单的浮层语汇(am-item),行内锚定向下展开。 */
+.row-menu { position: relative; }
+.row-menu-pop { position: absolute; top: calc(100% + 6px); left: 0; min-width: 148px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 6px; z-index: 40; }
+.row-menu-pop .am-item { display: block; width: 100%; text-align: left; padding: 8px 10px; border: none; border-radius: 7px;
+  background: transparent; font-size: 13px; color: var(--ink); cursor: pointer; }
+.row-menu-pop .am-item:hover { background: var(--surface-2); color: var(--brand); }
+.row-menu-pop .am-item:disabled { color: var(--ink-muted); cursor: default; background: transparent; }
 
 /* ============ 专注工作区顶栏 ============ */
 .focus-top { height: 56px; background: var(--surface); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 14px; padding: 0 18px; position: sticky; top: 0; z-index: 50; }
