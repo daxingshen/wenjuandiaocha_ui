@@ -3,18 +3,35 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "设计 token(CSS 变量,源自 prototype.html)+ 通用组件",
+  "description": "设计 token(CSS 变量,源自 prototype.html)+ 通用组件 + 欢迎页富内容(编辑器/消毒/只读渲染,studio 编辑与 runtime 只读共用)",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./welcome": "./src/welcome/index.ts",
     "./tokens.css": "./src/tokens.css",
     "./components.css": "./src/components.css"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@xingjuan/engine": "workspace:*",
+    "react-quill-new": "3.8.3",
+    "dompurify": "3.4.14"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.2"
+    "@types/react": "^19.0.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "jsdom": "25.0.1"
   }
 }

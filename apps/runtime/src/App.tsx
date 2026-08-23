@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import type { SurveySchema } from '@xingjuan/engine';
 import { ApiError, fetchSurvey, submitAnswers, submitAnswersAuthed, type AnswerAccess, type DisplayMode, type SubmitFn } from './api/client.js';
 import { Fill, type FillAuth } from './pages/Fill.js';
+import { Welcome } from './pages/Welcome.js';
 import { Done } from './pages/Done.js';
 import { LoginGate } from './pages/LoginGate.js';
 import { useFill } from './useFill.js';
@@ -20,6 +21,10 @@ const DEMO: SurveySchema = {
   type: 'survey',
   title: '示例问卷(演示数据)',
   version: 1,
+  // 示例欢迎页富内容(dev 开箱见欢迎屏富内容渲染)。
+  welcome: {
+    html: '<p>欢迎参加这次调研 🙌 大约 1 分钟,<span style="color: #2a78d6;">全程匿名</span>。</p>',
+  },
   questions: [
     {
       id: 'q1',
@@ -220,7 +225,10 @@ function Survey({ schema, displayMode, demo, submit, auth }: { schema: SurveySch
           演示数据(未连接后端)
         </div>
       )}
-      {state.phase === 'fill' ? (
+      {state.phase === 'welcome' ? (
+        // 作答路径第 0 站:欢迎屏(登录闸门后、Fill 前)。点「开始作答」→ start → 进 fill。
+        <Welcome schema={schema} dispatch={dispatch} auth={auth} />
+      ) : state.phase === 'fill' ? (
         <Fill schema={schema} displayMode={displayMode} state={state} dispatch={dispatch} submit={submit} auth={auth} />
       ) : (
         <Done rows={state.submittedRows} dispatch={dispatch} auth={auth} />

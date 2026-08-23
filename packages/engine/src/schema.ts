@@ -31,6 +31,16 @@ export interface Question {
   props: Record<string, unknown>;
 }
 
+/**
+ * 欢迎页富内容:作答者正式作答前先看到的一屏(标题 + 这段富内容 + 开始作答按钮)。
+ * html 是富文本 HTML 串。**安全约束**:属不可信输入,渲染前必须经 XSS 消毒(白名单标签/属性),
+ * 永不直接注入 DOM。后端当不透明字符串存/传,不解析内容。
+ */
+export interface WelcomeContent {
+  /** 富文本 HTML 串。渲染前必须经 XSS 消毒;缺省/空串=无欢迎内容。 */
+  html: string;
+}
+
 /** 一份问卷(某个已发布版本)。 */
 export interface SurveySchema {
   id: string;
@@ -41,6 +51,8 @@ export interface SurveySchema {
   questions: Question[];
   /** 逻辑规则,独立于题目(约束 3) */
   rules: LogicRule[];
+  /** 欢迎页富内容(可选)。缺省=无欢迎内容,作答端仍显欢迎页但省略内容区。向后兼容:旧 schema 无此字段。 */
+  welcome?: WelcomeContent;
 }
 
 /** 一条逻辑规则的条件:某题的答案与某值的比较。 */

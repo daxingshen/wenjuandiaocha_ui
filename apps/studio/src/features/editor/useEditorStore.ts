@@ -3,7 +3,7 @@
  * 题型专属默认值全走 engine 注册表的 handler.defaultProps(加题型零改动)。
  */
 import { create } from 'zustand';
-import { getHandler, type LogicRule, type Question, type SurveySchema } from '@xingjuan/engine';
+import { getHandler, type LogicRule, type Question, type SurveySchema, type WelcomeContent } from '@xingjuan/engine';
 
 /** 生成问卷内唯一的题目 id。 */
 let qseq = 0;
@@ -19,6 +19,10 @@ function seedSchema(): SurveySchema {
     type: 'survey',
     title: '未命名问卷',
     version: 1,
+    // 示例欢迎页富内容(dev 开箱见欢迎屏):一段带颜色的欢迎语(Quill HTML)。
+    welcome: {
+      html: '<p>感谢你抽出 2 分钟填写这份问卷 🙌 <span style="color: #2a78d6;">全程匿名</span>,你的回答只用于产品改进。</p>',
+    },
     questions: [
       {
         id: 'seed_1',
@@ -57,6 +61,8 @@ export interface EditorState {
   load: (schema: SurveySchema) => void;
   /** 修改问卷标题 */
   setTitle: (title: string) => void;
+  /** 修改欢迎页富内容(HTML 串)。传 undefined 清除 welcome 字段(回落无欢迎内容,向后兼容)。 */
+  setWelcome: (welcome: WelcomeContent | undefined) => void;
   /** 追加一道指定题型的新题(props 取该题型 defaultProps),并选中它 */
   addQuestion: (type: string) => void;
   /** 选中某题(重置选项选中) */
@@ -86,6 +92,9 @@ export const useEditorStore = create<EditorState>((set) => ({
   load: (schema) => set({ schema, selectedQid: schema.questions[0]?.id ?? null, selectedOptIndex: null }),
 
   setTitle: (title) => set((s) => (s.schema ? { schema: { ...s.schema, title } } : s)),
+
+  setWelcome: (welcome) =>
+    set((s) => (s.schema ? { schema: { ...s.schema, welcome } } : s)),
 
   addQuestion: (type) =>
     set((s) => {

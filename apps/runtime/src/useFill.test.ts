@@ -101,7 +101,8 @@ describe('提交态机', () => {
   it('reset 回到初始并清盘', () => {
     localStorage.setItem(KEY, JSON.stringify({ q1: 'a' }));
     const s = reducer(base({ phase: 'done', submittedRows: 2 }), { type: 'reset' });
-    expect(s).toEqual(base());
+    // v3:reset 回到欢迎页(第 0 站),而非直接 fill——重置后重新走一遍欢迎屏。
+    expect(s).toEqual(base({ phase: 'welcome' }));
     expect(localStorage.getItem(KEY)).toBeNull();
   });
 });
@@ -177,5 +178,45 @@ describe('孤儿缓存清理(sweepStaleVersions)', () => {
     expect(localStorage.getItem('xingjuan:answers:sid-x:v1')).toBeNull(); // 旧版孤儿清掉
     expect(localStorage.getItem('xingjuan:answers:sid-x:v2')).toBe(JSON.stringify({ q1: 'cur' })); // 当前版保留
     expect(localStorage.getItem('xingjuan:answers:sid-y:v1')).toBe(JSON.stringify({ q1: 'other' })); // 他卷保留
+  });
+});
+
+describe('欢迎页相位(welcome phase + startedKey)', () => {
+  const STARTED_KEY = 'xingjuan:started:sid-test:v1';
+
+  it('首次进入(无 started 标记)初始相位为 welcome', () => {
+    const s = makeInitialState('sid-test', 1);
+    expect(s.phase).toBe('welcome');
+  });
+
+  it('start action 落 started 标记并进 fill', () => {
+    const s = reducer(base({ phase: 'welcome' }), { type: 'start' });
+    expect(s.phase).toBe('fill');
+    expect(localStorage.getItem(STARTED_KEY)).toBe('1');
+  });
+
+  it('已点过开始(有 started 标记)续答直接回 fill,不重看欢迎', () => {
+    localStorage.setItem(STARTED_KEY, '1');
+    const s = makeInitialState('sid-test', 1);
+    expect(s.phase).toBe('fill');
+  });
+
+  it('done 清 started 标记', () => {
+    localStorage.setItem(STARTED_KEY, '1');
+    reducer(base({ phase: 'fill' }), { type: 'done', rows: 3 });
+    expect(localStorage.getItem(STARTED_KEY)).toBeNull();
+  });
+
+  it('reset 回到 welcome 并清 started 标记', () => {
+    localStorage.setItem(STARTED_KEY, '1');
+    const s = reducer(base({ phase: 'fill' }), { type: 'reset' });
+    expect(s.phase).toBe('welcome');
+    expect(localStorage.getItem(STARTED_KEY)).toBeNull();
+  });
+
+  it('started 标记按版本隔离:v1 已开始不影响 v2', () => {
+    localStorage.setItem(STARTED_KEY, '1');
+    const s2 = makeInitialState('sid-test', 2); // 不同版本
+    expect(s2.phase).toBe('welcome');
   });
 });
