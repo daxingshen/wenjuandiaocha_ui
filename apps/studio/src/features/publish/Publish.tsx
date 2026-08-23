@@ -52,7 +52,10 @@ export function Publish({ id, onGoEdit }: PublishProps) {
   const [notice, setNotice] = useState('');
   const [copied, setCopied] = useState(false);
   // 生命周期动作(发布/暂停/继续)统一走二次确认:点击先记下 kind,弹确认框,确认才执行。
-  const [confirm, setConfirm] = useState<'publish' | 'close' | 'reopen' | null>(null);
+  // access:发布后(live/closed)切换作答访问模式也走确认——门禁列提交时实时读,切换立即改变谁能作答。
+  const [confirm, setConfirm] = useState<'publish' | 'close' | 'reopen' | 'access' | null>(null);
+  // access 确认需要知道待切换的目标值(确认框点头后才落库),暂存于此。
+  const [pendingAccess, setPendingAccess] = useState<AnswerAccess | null>(null);
 
   const link = answerLink(id, resolveRuntimeBase());
 
@@ -84,11 +87,11 @@ export function Publish({ id, onGoEdit }: PublishProps) {
     }
   };
 
-  // 切换作答访问模式(仅 draft 可改)。乐观更新 + 失败回滚;后端为唯一强制点。
+  // 切换作答访问模式:draft 直切;发布后(live/closed)门禁列实时生效,先弹确认再切。
+  // 乐观更新 + 失败回滚;后端为唯一强制点。
   const [accessBusy, setAccessBusy] = useState(false);
-  const onToggleAccess = async () => {
-    if (accessBusy || !stats) return;
-    const next: AnswerAccess = stats.answerAccess === 'login_required' ? 'anonymous' : 'login_required';
+  const applyAccess = async (next: AnswerAccess) => {
+    if (!stats) return;
     setAccessBusy(true);
     setNotice('');
     try {
@@ -101,8 +104,19 @@ export function Publish({ id, onGoEdit }: PublishProps) {
       setAccessBusy(false);
     }
   };
+  const onToggleAccess = async () => {
+    if (accessBusy || !stats) return;
+    const next: AnswerAccess = stats.answerAccess === 'login_required' ? 'anonymous' : 'login_required';
+    if (published) {
+      // 发布后:切换即改变门禁,弹确认框,确认才落库。
+      setPendingAccess(next);
+      setConfirm('access');
+      return;
+    }
+    await applyAccess(next);
+  };
 
-  // 切换作答呈现形态(仅 draft 可改)。乐观更新 + 失败回滚,与 onToggleAccess 同构;后端为唯一强制点。
+  // 切换作答呈现形态(任意状态直切,无门禁风险故不加确认)。乐观更新 + 失败回滚;后端为唯一强制点。
   const [displayBusy, setDisplayBusy] = useState(false);
   const onToggleDisplayMode = async () => {
     if (displayBusy || !stats) return;
@@ -124,6 +138,13 @@ export function Publish({ id, onGoEdit }: PublishProps) {
   // publish(首发:冻结草稿为 v1 并 live)/ close(暂停)/ reopen(继续:原样恢复上次发布的旧快照)。
   const runConfirmed = async () => {
     if (!confirm) return;
+    // access 走独立乐观更新路径(不重拉 stats、复用 applyAccess 的 try/catch/notice)。
+    if (confirm === 'access') {
+      if (pendingAccess) await applyAccess(pendingAccess);
+      setPendingAccess(null);
+      setConfirm(null);
+      return;
+    }
     setBusy(true);
     setNotice('');
     try {
@@ -145,7 +166,7 @@ export function Publish({ id, onGoEdit }: PublishProps) {
   };
 
   // 确认框文案(按 kind)。发布/暂停/继续三动作各讲清后果。
-  const CONFIRM_META: Record<'publish' | 'close' | 'reopen', { title: string; body: string; confirmLabel: string }> = {
+  const CONFIRM_META: Record<'publish' | 'close' | 'reopen' | 'access', { title: string; body: string; confirmLabel: string }> = {
     publish: {
       title: '发布问卷',
       body: '将发布编辑页里已保存的最新内容并正式对外接收作答;未保存的编辑不会包含(如刚在编辑器改动,请先返回编辑页保存)。确认发布?',
@@ -160,6 +181,11 @@ export function Publish({ id, onGoEdit }: PublishProps) {
       title: '继续发布',
       body: '将恢复上次发布的版本重新对外接收作答(内容与暂停前一致)。确认继续?',
       confirmLabel: '继续发布',
+    },
+    access: {
+      title: '切换作答访问模式',
+      body: '问卷正在回收,切换将立即改变谁能作答:改为需登录会拒绝匿名在途受访者,改为匿名会放宽限制。确认切换?',
+      confirmLabel: '确认切换',
     },
   };
 
@@ -223,58 +249,38 @@ export function Publish({ id, onGoEdit }: PublishProps) {
             <div className="ct">设置</div>
             <div className="cs">作答形态与防刷配额,保证样本质量</div>
 
-            {/* 作答访问模式。draft 可切;发布后(live/closed)锁定,纯文字回显;new 态无库行不显示。 */}
-            {stats && (
-              answerAccessControlMode(status) === 'editable' ? (
-                <div className="toggle-row">
-                  <div>
-                    <span>需登录才能作答</span>
-                    <div className="cd" style={{ marginTop: 2 }}>关闭后任何人凭链接可匿名作答</div>
-                  </div>
-                  <div
-                    className={`sw${stats.answerAccess === 'login_required' ? ' on' : ''}`}
-                    role="switch"
-                    aria-checked={stats.answerAccess === 'login_required'}
-                    aria-label="需登录才能作答"
-                    title="仅未发布时可改"
-                    onClick={() => { if (!accessBusy) void onToggleAccess(); }}
-                  />
+            {/* 作答访问模式。已落库问卷(draft/live/closed)均可切;发布后切换走二次确认(见 onToggleAccess);new 态无库行不显示。 */}
+            {stats && answerAccessControlMode(status) === 'editable' && (
+              <div className="toggle-row">
+                <div>
+                  <span>需登录才能作答</span>
+                  <div className="cd" style={{ marginTop: 2 }}>关闭后任何人凭链接可匿名作答</div>
                 </div>
-              ) : (
-                <div className="toggle-row" style={{ opacity: 0.7 }}>
-                  <span>作答访问模式</span>
-                  <span style={{ color: 'var(--ink-2)', fontSize: 13 }}>
-                    {stats.answerAccess === 'login_required' ? '需登录作答(发布后锁定)' : '匿名作答(发布后锁定)'}
-                  </span>
-                </div>
-              )
+                <div
+                  className={`sw${stats.answerAccess === 'login_required' ? ' on' : ''}`}
+                  role="switch"
+                  aria-checked={stats.answerAccess === 'login_required'}
+                  aria-label="需登录才能作答"
+                  onClick={() => { if (!accessBusy) void onToggleAccess(); }}
+                />
+              </div>
             )}
 
-            {/* 作答呈现形态(逐题/单页)。与访问模式同一 gate:draft 可切;发布后锁定回显;new 不显示。 */}
-            {stats && (
-              answerAccessControlMode(status) === 'editable' ? (
-                <div className="toggle-row">
-                  <div>
-                    <span>逐题作答(每题一页)</span>
-                    <div className="cd" style={{ marginTop: 2 }}>关闭则所有题目在同一页展示</div>
-                  </div>
-                  <div
-                    className={`sw${stats.displayMode === 'paged' ? ' on' : ''}`}
-                    role="switch"
-                    aria-checked={stats.displayMode === 'paged'}
-                    aria-label="逐题作答(每题一页)"
-                    title="仅未发布时可改"
-                    onClick={() => { if (!displayBusy) void onToggleDisplayMode(); }}
-                  />
+            {/* 作答呈现形态(逐题/单页)。与访问模式同一 gate:已落库均可切;无门禁风险,任意状态直切不确认;new 不显示。 */}
+            {stats && answerAccessControlMode(status) === 'editable' && (
+              <div className="toggle-row">
+                <div>
+                  <span>逐题作答(每题一页)</span>
+                  <div className="cd" style={{ marginTop: 2 }}>关闭则所有题目在同一页展示</div>
                 </div>
-              ) : (
-                <div className="toggle-row" style={{ opacity: 0.7 }}>
-                  <span>逐题作答</span>
-                  <span style={{ color: 'var(--ink-2)', fontSize: 13 }}>
-                    {stats.displayMode === 'paged' ? '已开启(发布后锁定)' : '已关闭(发布后锁定)'}
-                  </span>
-                </div>
-              )
+                <div
+                  className={`sw${stats.displayMode === 'paged' ? ' on' : ''}`}
+                  role="switch"
+                  aria-checked={stats.displayMode === 'paged'}
+                  aria-label="逐题作答(每题一页)"
+                  onClick={() => { if (!displayBusy) void onToggleDisplayMode(); }}
+                />
+              </div>
             )}
 
             {SOON_CONTROLS.map((label) => (
