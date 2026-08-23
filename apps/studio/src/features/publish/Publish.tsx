@@ -18,6 +18,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { publishSurvey, closeSurvey, reopenSurvey, getSurveyStats, setAnswerAccess, setDisplayMode, type SurveyStats, type AnswerAccess, type DisplayMode } from '../../api/surveys.js';
 import { ConfirmDialog } from '../../components/ConfirmDialog.js';
 import { answerLink, resolveRuntimeBase } from './publishLink.js';
+import { copyText } from './copyText.js';
 import { answerAccessControlMode } from './answerAccessControl.js';
 
 // 发布页采用「暂停/继续」词汇,故 closed 标为「已暂停」(与本页 close 按钮「暂停发布」自洽);
@@ -78,11 +79,13 @@ export function Publish({ id, onGoEdit }: PublishProps) {
   const badge = STATUS_LABEL[status];
 
   const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(link);
+    // navigator.clipboard 仅在安全上下文(HTTPS / localhost)可用;
+    // 局域网 IP + HTTP 打开 studio 时它为 undefined,故降级到 execCommand。
+    const ok = await copyText(link);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
-    } catch {
+    } else {
       setNotice('复制失败,请手动复制链接');
     }
   };
