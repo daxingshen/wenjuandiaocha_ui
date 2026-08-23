@@ -2,12 +2,40 @@
  * 问卷看板:应用外壳(顶栏 + 左侧导航 + 主视图),对齐原型。
  * 类型只是筛选维度,非独立系统(UI 文档 §3.2「一套引擎」)。后端未接:列表用示例数据。
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TopBar } from '../../components/TopBar.js';
 import { ConfirmDialog } from '../../components/ConfirmDialog.js';
-import { listSurveys, type SurveyListItem } from '../../api/surveys.js';
+import { listSurveys, copySurvey, type SurveyListItem } from '../../api/surveys.js';
 import { canEditSurvey } from './editGate.js';
+
+/** 行内线性图标(继承 currentColor,可由 className 上色)。paths 为 SVG path 的 d 值数组。 */
+const ICON_PATHS: Record<string, string[]> = {
+  edit: ['M12 20h9', 'M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'],
+  share: ['M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7', 'M16 6l-4-4-4 4', 'M12 2v13'],
+  chart: ['M3 3v18h18', 'M8 15v3', 'M13 10v8', 'M18 6v12'],
+  caret: ['M6 9l6 6 6-6'],
+};
+function Icon({ name, className }: { name: keyof typeof ICON_PATHS; className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {(ICON_PATHS[name] ?? []).map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
+}
 
 /** 类型 → 色板槽位 + 图标(对照原型 typeMeta / 类型色映射 UI 文档 §2.1)。 */
 const TYPE_META: Record<string, { color: string; ic: string; label: string }> = {
@@ -112,6 +140,30 @@ export function Dashboard() {
   const [error, setError] = useState('');
   // 已发布问卷被拦下的编辑尝试:持有被拦问卷,非空即弹拦截窗。null = 无拦截。
   const [blocked, setBlocked] = useState<SurveyListItem | null>(null);
+  // 「编辑设计」下拉:记录哪一行的菜单开着(一次只开一个)。null = 全关。
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  // 复制进行中的行 id(禁用该行菜单项、防重复提交)。
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+  // 复制失败提示:非空即弹信息型窗。
+  const [copyError, setCopyError] = useState('');
+  const menuWrapRef = useRef<HTMLDivElement>(null);
+
+  // 下拉浮层:点浮层外部或按 Esc 关闭(复刻 TopBar 头像菜单模式)。
+  useEffect(() => {
+    if (openMenuId === null) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuWrapRef.current && !menuWrapRef.current.contains(e.target as Node)) setOpenMenuId(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenMenuId(null);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [openMenuId]);
 
   // 搜索态:有生效搜索词时后端只返回前 10 条、不翻页,前端隐藏页码器。
   const searching = activeQuery !== '';
@@ -193,8 +245,23 @@ export function Dashboard() {
   // 编辑入口守卫:仅草稿可进编辑器。已发布(进行中/已截止)问卷内容已冻结,弹窗拦下、不跳转。
   // 这只是体验层;真正防线在后端 Update 接口(非草稿返 40901)。
   const onEdit = (s: SurveyListItem) => {
+    setOpenMenuId(null);
     if (canEditSurvey(s.status)) navigate(`/survey/${s.id}/edit`);
     else setBlocked(s);
+  };
+
+  // 复制问卷:任意状态可复制。成功后直接进入新问卷编辑器(gate① 确认);失败弹信息窗。
+  const onCopy = async (s: SurveyListItem) => {
+    setOpenMenuId(null);
+    setCopyingId(s.id);
+    try {
+      const newId = await copySurvey(s.id);
+      navigate(`/survey/${newId}/edit`);
+    } catch {
+      setCopyError('复制失败,请重试。');
+    } finally {
+      setCopyingId(null);
+    }
   };
 
   // 筛选/搜索/翻页全在后端做,前端直接渲染返回结果。
@@ -278,10 +345,41 @@ export function Dashboard() {
                       </div>
                     </div>
                     <div className="ops">
-                      <button className="btn sm" onClick={() => onEdit(s)}>✏️ 编辑设计</button>
+                      {/* 「编辑设计」下拉:编辑问卷(草稿进编辑器,已发布弹锁定告知)+ 复制问卷(派生可编辑副本)。 */}
+                      <div className="row-menu" ref={openMenuId === s.id ? menuWrapRef : undefined}>
+                        <button
+                          className="btn sm"
+                          aria-haspopup="menu"
+                          aria-expanded={openMenuId === s.id}
+                          onClick={() => setOpenMenuId((cur) => (cur === s.id ? null : s.id))}
+                        >
+                          <Icon name="edit" className="btn-ic edit" />
+                          编辑
+                          <Icon name="caret" className={`caret${openMenuId === s.id ? ' open' : ''}`} />
+                        </button>
+                        {openMenuId === s.id && (
+                          <nav className="row-menu-pop" role="menu">
+                            <button className="am-item" role="menuitem" onClick={() => onEdit(s)}>
+                              编辑问卷
+                            </button>
+                            <button
+                              className="am-item"
+                              role="menuitem"
+                              disabled={copyingId === s.id}
+                              onClick={() => void onCopy(s)}
+                            >
+                              {copyingId === s.id ? '复制中…' : '复制问卷'}
+                            </button>
+                          </nav>
+                        )}
+                      </div>
                       {/* 发布/暂停/继续等生命周期动作集中在发布页(发送分享),看板列表只做导航。 */}
-                      <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/publish`)}>📤 发送分享</button>
-                      <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/analyze`)}>📊 分析下载</button>
+                      <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/publish`)}>
+                        <Icon name="share" className="btn-ic share" /> 发送分享
+                      </button>
+                      <button className="btn sm" onClick={() => navigate(`/survey/${s.id}/analyze`)}>
+                        <Icon name="chart" className="btn-ic chart" /> 分析下载
+                      </button>
                       <div className="spring" />
                       <button className="btn sm ghost" title="更多">⋯</button>
                     </div>
@@ -328,6 +426,17 @@ export function Dashboard() {
         confirmLabel="知道了"
         onConfirm={() => setBlocked(null)}
         onCancel={() => setBlocked(null)}
+      />
+
+      {/* 复制失败:信息型单按钮告知,关闭后留在看板。 */}
+      <ConfirmDialog
+        open={copyError !== ''}
+        hideCancel
+        title="复制失败"
+        body={copyError}
+        confirmLabel="知道了"
+        onConfirm={() => setCopyError('')}
+        onCancel={() => setCopyError('')}
       />
     </div>
   );

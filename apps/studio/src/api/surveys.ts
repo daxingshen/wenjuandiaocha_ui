@@ -81,6 +81,16 @@ export async function getSurvey(id: string): Promise<SurveySchema> {
   return apiGet<SurveySchema>(`/surveys/${id}`);
 }
 
+/**
+ * 复制问卷:把源问卷的草稿结构整份拷入一个新 draft 问卷(标题加「(副本)」、沿用源作答配置),
+ * 让已发布(不可编辑)的问卷能以副本形式继续编辑。后端分配新 id 并返回。
+ * 归属校验:非 owner 且非 admin → 后端 404。任意状态(draft/live/closed)均可复制。
+ */
+export async function copySurvey(id: string): Promise<string> {
+  const { id: newId } = await apiSend<{ id: string }>(`/surveys/${id}/copy`, 'POST');
+  return newId;
+}
+
 /** 保存草稿(整份 schema)。 */
 export async function saveSurvey(schema: SurveySchema): Promise<void> {
   await apiSend<{ ok: boolean }>(`/surveys/${schema.id}`, 'PUT', schema);
