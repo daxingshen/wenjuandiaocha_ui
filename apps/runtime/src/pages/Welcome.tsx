@@ -37,7 +37,7 @@ export function Welcome({
         )}
       </header>
 
-      <div className="fill-wrap">
+      <div className="wel-wrap">
         <main className="wel-screen">
           <div className="wel-eyebrow">欢迎</div>
           <h1 className="wel-title">{schema.title}</h1>

@@ -830,23 +830,30 @@ table.cross tr.total th, table.cross tr.total td, table.cross td.total { backgro
 .wel-body .ql-indent-8 { padding-left: 24em; }
 
 /* —— 作答侧:欢迎屏(登录闸门后、Fill 前;居中列,无路径栏) —— */
+/* 欢迎页容器:整宽普通块(非 .fill-wrap 的双栏 grid——欢迎页无路径栏,
+   套双栏会把唯一的 .wel-screen 塞进 264px 首列 → 电脑端挤左、移动端撑破右缘)。
+   .wel-screen 自带 max-width+margin auto,故这里只需给它一个满宽块级父容器。 */
+.wel-wrap { width: 100%; }
 .wel-screen {
   max-width: 640px; margin: 0 auto; width: 100%; padding: 64px 28px 96px;
-  display: flex; flex-direction: column; align-items: flex-start;
+  /* 整块水平居中(标题/eyebrow/正文块/元信息/按钮同轴),文字默认居中;
+     长段落正文单独左对齐(见 .wel-body),避免多行文字锯齿。 */
+  display: flex; flex-direction: column; align-items: center; text-align: center;
 }
 .wel-screen .wel-eyebrow { margin-bottom: 14px; }
 .wel-title { font-size: 26px; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; margin: 0 0 16px; color: var(--ink); }
 /* 富内容只读渲染区(WelcomeView 也用于 studio 预览 hero;创建者的段落/字体/色 inline style 消毒后原样保留) */
-.wel-body { color: var(--ink-2); font-size: 15px; line-height: 1.7; max-width: 56ch; margin-bottom: 4px; }
+/* 正文块本身在居中列里居中(margin auto),但块内多行文字左对齐、宽度不超容器;
+   创建者用编辑器设的 ql-align-center/right 仍生效(优先级更高)。 */
+.wel-body { color: var(--ink-2); font-size: 15px; line-height: 1.7; max-width: min(56ch, 100%); margin: 0 auto 4px; text-align: left; }
 .wel-body p { margin: 0 0 10px; }
 .wel-body p:last-child { margin-bottom: 0; }
 .wel-body h3 { font-size: 18px; font-weight: 700; color: var(--ink); margin: 6px 0 10px; }
 .wel-body ul, .wel-body ol { margin: 0 0 10px; padding-left: 1.4em; }
 .wel-body blockquote { margin: 0 0 10px; padding-left: 12px; border-left: 3px solid var(--line); color: var(--ink-muted); }
-.wel-meta { margin: 18px 0 0; display: flex; gap: 16px; font-size: 11.5px; color: var(--ink-muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.wel-meta { margin: 18px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; font-size: 11.5px; color: var(--ink-muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 .wel-meta b { color: var(--ink-2); font-variant-numeric: tabular-nums; }
-/* .wel-screen 是 align-items:flex-start 的列,故 320px 的动作块会贴左;用 margin auto 把块本身居中
-   (按钮 justify-content:center 只居中了块内文字,不居中块本身)。 */
+/* 动作块限宽 320px 并 margin auto 居中(与列的 align-items:center 一致)。 */
 .wel-actions { margin: 28px auto 0; width: 100%; max-width: 320px; }
 .wel-actions .btn.primary.lg { width: 100%; justify-content: center; }
 
