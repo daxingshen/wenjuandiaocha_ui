@@ -40,10 +40,15 @@ describe('deriveRuntimeBase', () => {
     expect(deriveRuntimeBase({ env: 'https://ans.xj.cn', dev: true, ...loc })).toBe('https://ans.xj.cn');
   });
 
-  it('prod 同源(非 dev、无 env)→ 回落 origin,行为不回退', () => {
+  it('prod 同源(非 dev、无 env)→ 回落 origin + /f 前缀(runtime 挂 /f,链接不指向根上的 studio)', () => {
     expect(
       deriveRuntimeBase({ dev: false, protocol: 'https:', hostname: 'xj.cn', origin: 'https://xj.cn' }),
-    ).toBe('https://xj.cn');
+    ).toBe('https://xj.cn/f');
+  });
+
+  it('prod 同源 + answerLink 端到端 → origin/f/#/s/:id(绝对可分享,运行时解析,不烤入部署域名)', () => {
+    const base = deriveRuntimeBase({ dev: false, protocol: 'https:', hostname: 'xj.cn', origin: 'https://xj.cn' });
+    expect(answerLink('x1', base)).toBe('https://xj.cn/f/#/s/x1');
   });
 
   it('保留访问协议(https 局域网也不降级)', () => {
