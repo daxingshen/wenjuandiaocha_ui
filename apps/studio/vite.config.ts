@@ -35,10 +35,10 @@ export default defineConfig(({ mode, command }) => {
       // 绑 0.0.0.0:监听所有网卡,局域网/容器内其它设备可访问(默认仅 localhost)。
       host: '0.0.0.0',
       port: 5173,
-      // dev 联调:/api 同源代理到后端,免 CORS、cookie 同源可带。后端默认 :8080。
+      // dev 联调:/api 同源代理到后端,免 CORS、cookie 同源可带。后端默认 :8089。
       proxy: {
         '/api': {
-          target: 'http://localhost:18080',
+          target: 'http://localhost:8089',
           changeOrigin: true,
         },
       },
