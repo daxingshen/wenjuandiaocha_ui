@@ -1,0 +1,15 @@
+# 精简前端构建上下文。node_modules 与 dist 在容器内重建,勿送进去(体积 + 平台错配)。
+.git
+.gitignore
+node_modules
+**/node_modules
+dist
+**/dist
+*.tsbuildinfo
+.vite
+coverage
+.DS_Store
+.idea/
+.vscode/
+Dockerfile
+.dockerignore

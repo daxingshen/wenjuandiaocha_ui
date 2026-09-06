@@ -6,11 +6,18 @@
  *   1) VITE_RUNTIME_BASE 显式配置 → 直接用(prod 异源部署 / 想钉死时的逃生口)。
  *   2) dev 未配置 → 用访问 studio 的 hostname + runtime 端口拼(谁用哪个 IP 访问,链接就用哪个 IP,
  *      故局域网其它设备扫码/点链接可作答;绝不写死 localhost)。
- *   3) prod 同源 → location.origin(studio 与 runtime 同源部署时正确)。
+ *   3) prod 同源 → location.origin + RUNTIME_PATH_PREFIX。容器化部署(docker-compose)下 studio 占根 /、
+ *      runtime 挂 /f(nginx 单入口按 path 分),故同源回落须带 /f 前缀,否则链接指向根上的 studio 而非 runtime。
  */
 
 /** dev 下 runtime 的固定端口(对齐 apps/runtime/vite.config.ts server.port)。 */
 export const RUNTIME_DEV_PORT = 5174;
+
+/**
+ * prod 同源部署下 runtime 的 path 前缀(对齐 nginx location /f/ 与 apps/runtime `vite build --base=/f/`)。
+ * 异源部署请用 VITE_RUNTIME_BASE 逃生口显式钉死完整 base,不走此前缀。
+ */
+export const RUNTIME_PATH_PREFIX = '/f';
 
 /** 拼作答链接。origin 参数化以便测试(默认读运行时 location)。 */
 export function answerLink(id: string, runtimeBase?: string, origin?: string): string {
@@ -33,7 +40,8 @@ export function deriveRuntimeBase(input: {
 }): string {
   if (input.env) return input.env;
   if (input.dev) return `${input.protocol}//${input.hostname}:${RUNTIME_DEV_PORT}`;
-  return input.origin;
+  // prod 同源:origin + /f 前缀(runtime 挂 /f)。answerLink 会去掉末尾斜杠,故此处不加。
+  return `${input.origin}${RUNTIME_PATH_PREFIX}`;
 }
 
 /** 从环境 + location 解析 runtime base(薄封装,读真实环境后交给 deriveRuntimeBase)。 */
